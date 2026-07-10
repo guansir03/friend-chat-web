@@ -604,7 +604,6 @@ function appendMessage(data, isMine) {
     bubble.classList.add("sticker-bubble");
     const container = document.createElement("div");
     container.className = "message-sticker";
-    container.textContent = data.emoji || "🧸";
     if (window.lottie) {
       try {
         let loaded = false;
@@ -627,6 +626,8 @@ function appendMessage(data, isMine) {
       } catch (e) {
         container.textContent = data.emoji || "🧸";
       }
+    } else {
+      container.textContent = data.emoji || "🧸";
     }
     bubble.appendChild(container);
   } else {
