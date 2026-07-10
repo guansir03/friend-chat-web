@@ -57,6 +57,11 @@ const imagePreview = document.getElementById("imagePreview");
 const previewImg = document.getElementById("previewImg");
 const removePreview = document.getElementById("removePreview");
 const uploadProgress = document.getElementById("uploadProgress");
+const testNotifyBtn = document.getElementById("testNotifyBtn");
+const imageModal = document.getElementById("imageModal");
+const imageModalImg = document.getElementById("imageModalImg");
+const imageModalClose = document.getElementById("imageModalClose");
+const imageModalBackdrop = document.querySelector(".image-modal-backdrop");
 
 let myName = "";
 let myAvatar = "🐱";
@@ -161,9 +166,11 @@ function updateNotifyState(enabled) {
     notifyBtn.classList.add("enabled");
     notifyBtn.title = "消息通知已开启";
     noticeBanner.hidden = true;
+    testNotifyBtn.hidden = false;
   } else {
     notifyBtn.classList.remove("enabled");
-    notifyBtn.title = "消息通知未开启";
+    notifyBtn.title = "点击开启消息通知";
+    testNotifyBtn.hidden = true;
   }
 }
 
@@ -177,6 +184,29 @@ enableNotifyBtn.addEventListener("click", async () => {
   if (!("Notification" in window)) return;
   const permission = await Notification.requestPermission();
   updateNotifyState(permission === "granted");
+});
+
+testNotifyBtn.addEventListener("click", () => {
+  showNotification("测试通知", "如果你看到这条系统弹窗，说明通知功能正常。");
+});
+
+// 图片预览弹窗
+function openImageModal(url) {
+  imageModalImg.src = url;
+  imageModal.hidden = false;
+}
+
+function closeImageModal() {
+  imageModal.hidden = true;
+  imageModalImg.src = "";
+}
+
+imageModalClose.addEventListener("click", closeImageModal);
+imageModalBackdrop.addEventListener("click", closeImageModal);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !imageModal.hidden) {
+    closeImageModal();
+  }
 });
 
 function showNotification(title, body) {
@@ -398,7 +428,7 @@ function appendMessage(data, isMine) {
     img.src = data.imageUrl;
     img.alt = "图片";
     img.loading = "lazy";
-    img.addEventListener("click", () => window.open(data.imageUrl, "_blank"));
+    img.addEventListener("click", () => openImageModal(data.imageUrl));
     bubble.appendChild(img);
   }
 

@@ -30,7 +30,10 @@
           <h1 id="chatTitle">朋友</h1>
           <span class="status" id="status">在线</span>
         </div>
-        <button class="notify-btn" id="notifyBtn" title="开启消息通知">🔔</button>
+        <div class="header-actions">
+          <button class="notify-btn" id="notifyBtn" title="开启消息通知">🔔</button>
+          <button class="test-notify-btn" id="testNotifyBtn" hidden>测试通知</button>
+        </div>
       </header>
 
       <main class="chat-main" id="chatMain">
@@ -68,9 +71,18 @@
         </div>
         <div class="hint">
           <span class="upload-progress" id="uploadProgress"></span>
-          <span>按 Enter 发送 · Shift+Enter 换行 · 支持图文混发</span>
+          <span>按 Enter 发送 · 支持图文混发 · 点击顶部 🔔 开启系统通知</span>
         </div>
       </footer>
+    </div>
+  </div>
+
+  <!-- 图片预览弹窗 -->
+  <div class="image-modal" id="imageModal" hidden>
+    <div class="image-modal-backdrop"></div>
+    <div class="image-modal-content">
+      <button class="image-modal-close" id="imageModalClose" title="关闭">✕</button>
+      <img id="imageModalImg" src="" alt="预览" />
     </div>
   </div>
 
