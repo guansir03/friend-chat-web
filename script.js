@@ -43,19 +43,19 @@ const avatarPicker = document.getElementById("avatarPicker");
 const startBtn = document.getElementById("startBtn");
 const setupHint = document.getElementById("setupHint");
 
-const myAvatarEl = document.getElementById("myAvatar");
-const myNameDisplayEl = document.getElementById("myNameDisplay");
-
 const messagesEl = document.getElementById("messages");
+const chatMain = document.getElementById("chatMain");
 const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
 const notifyBtn = document.getElementById("notifyBtn");
 const noticeBanner = document.getElementById("noticeBanner");
 const enableNotifyBtn = document.getElementById("enableNotifyBtn");
 const typingEl = document.getElementById("typing");
-const statusEl = document.querySelector(".qq-session-last");
 const emojiBtn = document.getElementById("emojiBtn");
 const imageInput = document.getElementById("imageInput");
+const imagePreview = document.getElementById("imagePreview");
+const previewImg = document.getElementById("previewImg");
+const removePreview = document.getElementById("removePreview");
 const uploadProgress = document.getElementById("uploadProgress");
 
 let myName = "";
@@ -64,6 +64,7 @@ let notificationsEnabled = false;
 let unreadCount = 0;
 let originalTitle = document.title;
 let isPageVisible = true;
+let pendingImage = null; // 待发送的图片 dataUrl
 
 const emojis = ["😀", "😂", "🥰", "😎", "😭", "😡", "👍", "❤️", "🎉", "🤔", "👀", "🙏"];
 const avatars = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🐸", "🐙", "🦄", "🐲", "👽"];
@@ -106,9 +107,6 @@ function enterChat() {
 
   setupEl.hidden = true;
   chatEl.hidden = false;
-  myAvatarEl.textContent = myAvatar;
-  myNameDisplayEl.textContent = myName;
-
   messageInput.focus();
   listenMessages();
   setupNotifications();
@@ -143,17 +141,13 @@ function tryAutoLogin() {
   enterChat();
 }
 
-// 页面加载后自动登录
 tryAutoLogin();
 
 // ===================== 6. 通知 =====================
 async function setupNotifications() {
   if (!("Notification" in window)) return;
-
   const permission = await Notification.requestPermission();
   updateNotifyState(permission === "granted");
-
-  // 如果还没允许，显示提示条
   if (permission !== "granted") {
     noticeBanner.hidden = false;
   }
@@ -213,19 +207,33 @@ function updateTitle() {
     : originalTitle;
 }
 
-// ===================== 7. 发送文字消息 =====================
+// ===================== 7. 发送消息 =====================
 function sendMessage() {
   const text = messageInput.value.trim();
-  if (!text || !db) return;
-  messageInput.value = "";
+  if ((!text && !pendingImage) || !db) return;
 
-  push(ref(db, `rooms/${ROOM_ID}/messages`), {
-    type: "text",
-    text,
+  const payload = {
     sender: myName,
     avatar: myAvatar,
     timestamp: serverTimestamp(),
-  }).catch((err) => {
+  };
+
+  if (pendingImage && text) {
+    payload.type = "mixed";
+    payload.text = text;
+    payload.imageUrl = pendingImage;
+  } else if (pendingImage) {
+    payload.type = "image";
+    payload.imageUrl = pendingImage;
+  } else {
+    payload.type = "text";
+    payload.text = text;
+  }
+
+  messageInput.value = "";
+  clearPendingImage();
+
+  push(ref(db, `rooms/${ROOM_ID}/messages`), payload).catch((err) => {
     console.error("发送失败", err);
     appendSystemMsg("消息发送失败，请检查网络或 Firebase 配置。");
   });
@@ -239,17 +247,16 @@ function sendMessage() {
 
 sendBtn.addEventListener("click", sendMessage);
 messageInput.addEventListener("keydown", (e) => {
-  // QQ 风格：Ctrl+Enter 发送，Enter 换行
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+  if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     sendMessage();
   }
 });
 
-// ===================== 8. 发送图片 =====================
+// ===================== 8. 图片处理 =====================
 imageInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
-  await uploadImage(file);
+  if (file) await prepareImage(file);
   imageInput.value = "";
 });
 
@@ -261,38 +268,40 @@ messageInput.addEventListener("paste", async (e) => {
     if (items[i].type.indexOf("image") !== -1) {
       e.preventDefault();
       const file = items[i].getAsFile();
-      if (file) await uploadImage(file);
+      if (file) await prepareImage(file);
       return;
     }
   }
 });
 
-async function uploadImage(file) {
-  if (!file || !db) return;
+removePreview.addEventListener("click", clearPendingImage);
 
+async function prepareImage(file) {
   try {
     uploadProgress.textContent = "图片压缩中...";
     const dataUrl = await compressImage(file, 1280, 0.8);
 
     if (dataUrl.length > 1.5 * 1024 * 1024) {
-      uploadProgress.textContent = "图片压缩后仍太大，请选更小的图片。";
+      uploadProgress.textContent = "图片太大，压缩后仍超过限制。";
       return;
     }
 
-    uploadProgress.textContent = "图片发送中...";
-    await push(ref(db, `rooms/${ROOM_ID}/messages`), {
-      type: "image",
-      imageUrl: dataUrl,
-      sender: myName,
-      avatar: myAvatar,
-      timestamp: serverTimestamp(),
-    });
-
+    pendingImage = dataUrl;
+    previewImg.src = dataUrl;
+    imagePreview.hidden = false;
     uploadProgress.textContent = "";
+    messageInput.focus();
   } catch (err) {
-    console.error("图片发送失败", err);
-    uploadProgress.textContent = "图片发送失败，请检查网络。";
+    console.error("图片处理失败", err);
+    uploadProgress.textContent = "图片处理失败。";
   }
+}
+
+function clearPendingImage() {
+  pendingImage = null;
+  previewImg.src = "";
+  imagePreview.hidden = true;
+  uploadProgress.textContent = "";
 }
 
 function compressImage(file, maxWidth = 1280, quality = 0.8) {
@@ -334,9 +343,6 @@ function listenMessages() {
 
     if (!isMine) {
       playMessageSound();
-      statusEl.textContent = `来自 ${data.sender}`;
-      setTimeout(() => (statusEl.textContent = "在线"), 2000);
-
       if (!isPageVisible) {
         unreadCount++;
         updateTitle();
@@ -350,10 +356,8 @@ function listenMessages() {
   onChildAdded(typingRef, (snapshot) => {
     const data = snapshot.val();
     if (data && data.sender !== myName) {
-      statusEl.textContent = `${data.sender} 正在输入...`;
       typingEl.hidden = false;
       setTimeout(() => {
-        statusEl.textContent = "在线";
         typingEl.hidden = true;
       }, 2000);
     }
@@ -363,35 +367,41 @@ function listenMessages() {
 // ===================== 10. UI 渲染 =====================
 function appendMessage(data, isMine) {
   const row = document.createElement("div");
-  row.className = `qq-message-row ${isMine ? "mine" : "theirs"}`;
+  row.className = `message-row ${isMine ? "mine" : "theirs"}`;
 
   const avatar = document.createElement("div");
-  avatar.className = "qq-message-avatar";
+  avatar.className = "message-avatar";
   avatar.textContent = data.avatar || "🧸";
 
   const body = document.createElement("div");
-  body.className = "qq-message-body";
+  body.className = "message-body";
 
   const sender = document.createElement("div");
-  sender.className = "qq-message-sender";
+  sender.className = "message-sender";
   sender.textContent = data.sender || "朋友";
 
   const bubble = document.createElement("div");
-  bubble.className = "qq-message-bubble";
+  bubble.className = "message-bubble";
 
-  if (data.type === "image" && data.imageUrl) {
+  if (data.text) {
+    const textDiv = document.createElement("div");
+    textDiv.className = "message-text";
+    textDiv.textContent = data.text;
+    bubble.appendChild(textDiv);
+  }
+
+  if (data.imageUrl) {
     const img = document.createElement("img");
+    img.className = "message-image";
     img.src = data.imageUrl;
     img.alt = "图片";
     img.loading = "lazy";
     img.addEventListener("click", () => window.open(data.imageUrl, "_blank"));
     bubble.appendChild(img);
-  } else {
-    bubble.textContent = data.text || "";
   }
 
   const time = document.createElement("div");
-  time.className = "qq-message-time";
+  time.className = "message-time";
   time.textContent = data.timestamp ? formatTime(new Date(data.timestamp)) : formatTime(new Date());
 
   body.appendChild(sender);
@@ -406,7 +416,7 @@ function appendMessage(data, isMine) {
 
 function appendSystemMsg(text) {
   const div = document.createElement("div");
-  div.className = "qq-system-msg";
+  div.className = "system-msg";
   div.textContent = text;
   messagesEl.appendChild(div);
   scrollToBottom();
@@ -417,7 +427,7 @@ function formatTime(date) {
 }
 
 function scrollToBottom() {
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  chatMain.scrollTop = chatMain.scrollHeight;
 }
 
 // ===================== 11. 提示音 =====================
@@ -465,7 +475,6 @@ emojiBtn.addEventListener("click", () => {
 function positionEmojiPanel() {
   if (!emojiPanel) return;
   const rect = emojiBtn.getBoundingClientRect();
-  emojiPanel.style.position = "fixed";
   emojiPanel.style.left = `${rect.left}px`;
   emojiPanel.style.top = `${rect.top - emojiPanel.offsetHeight - 10}px`;
 }
