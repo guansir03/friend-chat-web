@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Friend Chat</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Setup screen -->
+    <div class="setup" id="setup">
+      <div class="setup-card">
+        <h2>👋 欢迎来到 Friend Chat</h2>
+        <p>请输入一个昵称，开始和朋友聊天。</p>
+        <input type="text" id="nameInput" placeholder="你的昵称" maxlength="16" />
+        <button id="startBtn">进入聊天室</button>
+        <div class="setup-hint" id="setupHint"></div>
+      </div>
+    </div>
+
+    <!-- Chat screen -->
+    <div class="chat" id="chat" hidden>
+      <header class="chat-header">
+        <div class="avatar" id="friendAvatar">🧸</div>
+        <div class="header-info">
+          <h1 id="chatTitle">朋友</h1>
+          <span class="status" id="status">在线</span>
+        </div>
+        <button class="notify-btn" id="notifyBtn" title="开启消息通知">🔔</button>
+      </header>
+
+      <main class="chat-main" id="chatMain">
+        <div class="messages" id="messages">
+          <div class="system-msg">欢迎来到你们的专属聊天室 💬</div>
+        </div>
+        <div class="typing" id="typing" hidden>
+          <span></span><span></span><span></span>
+        </div>
+      </main>
+
+      <footer class="chat-footer">
+        <div class="input-area">
+          <button class="emoji-btn" id="emojiBtn" title="表情">😊</button>
+          <input
+            type="text"
+            id="messageInput"
+            placeholder="输入消息..."
+            autocomplete="off"
+          />
+          <button class="send-btn" id="sendBtn" title="发送">➤</button>
+        </div>
+        <div class="hint">按 Enter 发送 · 点击铃铛开启桌面通知</div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script type="module" src="script.js"></script>
+</body>
+</html>
