@@ -107,6 +107,8 @@ function enterChat() {
 
   setupEl.hidden = true;
   chatEl.hidden = false;
+  document.getElementById("chatTitle").textContent = myName;
+  document.getElementById("friendAvatar").textContent = myAvatar;
   messageInput.focus();
   listenMessages();
   setupNotifications();
