@@ -602,9 +602,10 @@ html, body {
 /* Emoji panel */
 .emoji-panel {
   position: fixed;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  max-height: 320px;
   padding: 10px;
   background: rgba(0, 0, 0, 0.35);
   border-radius: 14px;
@@ -612,17 +613,94 @@ html, body {
   z-index: 10;
 }
 
-.emoji-panel button {
+.emoji-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.emoji-tab {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.emoji-tab.active {
+  background: var(--mine);
+}
+
+.emoji-content {
+  display: grid;
+  gap: 4px;
+  overflow-y: auto;
+  max-height: 260px;
+  padding-right: 4px;
+}
+
+.emoji-content.normal-emojis {
+  grid-template-columns: repeat(8, 1fr);
+}
+
+.emoji-content.super-emojis {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.emoji-content button {
   background: transparent;
   border: none;
   font-size: 22px;
   cursor: pointer;
-  padding: 4px;
+  padding: 5px;
   border-radius: 8px;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, transform 0.15s;
 }
 
-.emoji-panel button:hover {
+.emoji-content button:hover {
   background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.15);
+}
+
+.super-emoji-btn {
+  font-size: 34px !important;
+  padding: 8px !important;
+}
+
+/* Sticker message */
+.message-bubble.sticker-bubble {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.message-sticker {
+  width: 120px;
+  height: 120px;
+  display: grid;
+  place-items: center;
+  font-size: 80px;
+  line-height: 1;
+}
+
+.message-sticker svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.history-item-sticker {
+  font-size: 48px;
+  line-height: 1;
+  padding: 4px 0;
 }
 
 /* Image modal */

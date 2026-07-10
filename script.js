@@ -77,7 +77,54 @@ let isPageVisible = true;
 let pendingImage = null; // 待发送的图片 dataUrl
 let messageHistory = []; // 用于历史记录展示
 
-const emojis = ["😀", "😂", "🥰", "😎", "😭", "😡", "👍", "❤️", "🎉", "🤔", "👀", "🙏"];
+const emojis = [
+  "😀", "😃", "😄", "😁", "😆", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉",
+  "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪",
+  "🤨", "🧐", "🤓", "😎", "🥸", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟",
+  "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠",
+  "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗",
+  "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮",
+  "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "😷",
+  "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "💩", "👻", "💀",
+  "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀",
+  "😿", "😾",
+  "👍", "👎", "👌", "🤌", "🤏", "✌️", "🤞", "🫰", "🤟", "🤘", "🤙", "👈",
+  "👉", "👆", "🖕", "👇", "☝️", "👋", "🤚", "🖐️", "✋", "🖖", "👏", "🙌",
+  "👐", "🤲", "🤝", "🙏", "✍️", "💪", "🫶",
+  "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💖", "💗", "💓",
+  "💞", "💕", "❣️", "💔", "💘", "💝", "💟", "♈", "♉", "♊", "♋", "♌",
+  "♍", "♎", "♏", "♐", "♑", "♒", "♓",
+  "🎉", "🎊", "🎈", "🎂", "🎁", "🎄", "🎃", "🧨", "✨", "🌟", "💫", "⭐",
+  "🌈", "🔥", "💥", "💯", "💢", "💦", "💧", "🌊"
+];
+
+const superEmojis = [
+  { emoji: "😂", codepoint: "1f602", name: "笑哭" },
+  { emoji: "😭", codepoint: "1f62d", name: "大哭" },
+  { emoji: "😍", codepoint: "1f60d", name: "花痴" },
+  { emoji: "🥰", codepoint: "1f970", name: "爱心脸" },
+  { emoji: "😘", codepoint: "1f618", name: "飞吻" },
+  { emoji: "🤣", codepoint: "1f923", name: "打滚笑" },
+  { emoji: "😎", codepoint: "1f60e", name: "酷" },
+  { emoji: "🥳", codepoint: "1f973", name: "派对" },
+  { emoji: "😡", codepoint: "1f621", name: "生气" },
+  { emoji: "🤯", codepoint: "1f92f", name: "爆炸头" },
+  { emoji: "🥺", codepoint: "1f97a", name: "可怜" },
+  { emoji: "🤩", codepoint: "1f929", name: "星星眼" },
+  { emoji: "😱", codepoint: "1f631", name: "惊吓" },
+  { emoji: "😴", codepoint: "1f634", name: "睡觉" },
+  { emoji: "🤮", codepoint: "1f92e", name: "呕吐" },
+  { emoji: "🤡", codepoint: "1f921", name: "小丑" },
+  { emoji: "💩", codepoint: "1f4a9", name: "便便" },
+  { emoji: "👻", codepoint: "1f47b", name: "幽灵" },
+  { emoji: "❤️", codepoint: "2764", name: "红心" },
+  { emoji: "🔥", codepoint: "1f525", name: "火" },
+  { emoji: "🎉", codepoint: "1f389", name: "庆祝" },
+  { emoji: "👍", codepoint: "1f44d", name: "赞" },
+  { emoji: "🙏", codepoint: "1f64f", name: "祈祷" },
+  { emoji: "🎃", codepoint: "1f383", name: "南瓜" }
+];
+
 const avatars = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🐸", "🐙", "🦄", "🐲", "👽"];
 const IDENTITY_KEY = "friend-chat-identity";
 
@@ -285,6 +332,13 @@ function renderHistory(messages) {
     timeSpan.textContent = time;
     sender.appendChild(timeSpan);
 
+    if (msg.type === "sticker" && msg.codepoint) {
+      const stickerDiv = document.createElement("div");
+      stickerDiv.className = "history-item-sticker";
+      stickerDiv.textContent = msg.emoji || "🧸";
+      body.appendChild(stickerDiv);
+    }
+
     if (msg.text) {
       const textDiv = document.createElement("div");
       textDiv.className = "history-item-text";
@@ -349,6 +403,23 @@ function updateTitle() {
 }
 
 // ===================== 7. 发送消息 =====================
+function sendSticker(sticker) {
+  if (!db) return;
+  const payload = {
+    type: "sticker",
+    stickerType: "lottie",
+    emoji: sticker.emoji,
+    codepoint: sticker.codepoint,
+    sender: myName,
+    avatar: myAvatar,
+    timestamp: serverTimestamp(),
+  };
+  push(ref(db, `rooms/${ROOM_ID}/messages`), payload).catch((err) => {
+    console.error("发送失败", err);
+    appendSystemMsg("表情发送失败，请检查网络或 Firebase 配置。");
+  });
+}
+
 function sendMessage() {
   const text = messageInput.value.trim();
   if ((!text && !pendingImage) || !db) return;
@@ -489,7 +560,10 @@ function listenMessages() {
       if (!isPageVisible) {
         unreadCount++;
         updateTitle();
-        const notifyBody = data.type === "image" ? "[图片]" : data.text || "新消息";
+        let notifyBody = "新消息";
+        if (data.type === "image") notifyBody = "[图片]";
+        else if (data.type === "sticker") notifyBody = "[超级表情]";
+        else if (data.text) notifyBody = data.text;
         showNotification(data.sender || "朋友", notifyBody);
       }
     }
@@ -526,21 +600,52 @@ function appendMessage(data, isMine) {
   const bubble = document.createElement("div");
   bubble.className = "message-bubble";
 
-  if (data.text) {
-    const textDiv = document.createElement("div");
-    textDiv.className = "message-text";
-    textDiv.textContent = data.text;
-    bubble.appendChild(textDiv);
-  }
+  if (data.type === "sticker" && data.codepoint) {
+    bubble.classList.add("sticker-bubble");
+    const container = document.createElement("div");
+    container.className = "message-sticker";
+    container.textContent = data.emoji || "🧸";
+    if (window.lottie) {
+      try {
+        let loaded = false;
+        const anim = window.lottie.loadAnimation({
+          container,
+          renderer: "svg",
+          loop: true,
+          autoplay: true,
+          path: `https://fonts.gstatic.com/s/e/notoemoji/latest/${data.codepoint}/lottie.json`,
+        });
+        anim.addEventListener("data_ready", () => {
+          loaded = true;
+        });
+        anim.addEventListener("error", () => {
+          container.textContent = data.emoji || "🧸";
+        });
+        setTimeout(() => {
+          if (!loaded) container.textContent = data.emoji || "🧸";
+        }, 5000);
+      } catch (e) {
+        container.textContent = data.emoji || "🧸";
+      }
+    }
+    bubble.appendChild(container);
+  } else {
+    if (data.text) {
+      const textDiv = document.createElement("div");
+      textDiv.className = "message-text";
+      textDiv.textContent = data.text;
+      bubble.appendChild(textDiv);
+    }
 
-  if (data.imageUrl) {
-    const img = document.createElement("img");
-    img.className = "message-image";
-    img.src = data.imageUrl;
-    img.alt = "图片";
-    img.loading = "lazy";
-    img.addEventListener("click", () => openImageModal(data.imageUrl));
-    bubble.appendChild(img);
+    if (data.imageUrl) {
+      const img = document.createElement("img");
+      img.className = "message-image";
+      img.src = data.imageUrl;
+      img.alt = "图片";
+      img.loading = "lazy";
+      img.addEventListener("click", () => openImageModal(data.imageUrl));
+      bubble.appendChild(img);
+    }
   }
 
   const time = document.createElement("div");
@@ -600,17 +705,73 @@ emojiBtn.addEventListener("click", () => {
   }
   emojiPanel = document.createElement("div");
   emojiPanel.className = "emoji-panel";
-  emojis.forEach((emoji) => {
-    const btn = document.createElement("button");
-    btn.textContent = emoji;
-    btn.addEventListener("click", () => {
-      messageInput.value += emoji;
-      messageInput.focus();
-      emojiPanel.remove();
-      emojiPanel = null;
+
+  const tabs = document.createElement("div");
+  tabs.className = "emoji-tabs";
+
+  const normalTab = document.createElement("button");
+  normalTab.className = "emoji-tab active";
+  normalTab.textContent = "😊 表情";
+
+  const superTab = document.createElement("button");
+  superTab.className = "emoji-tab";
+  superTab.textContent = "✨ 超级表情";
+
+  tabs.appendChild(normalTab);
+  tabs.appendChild(superTab);
+  emojiPanel.appendChild(tabs);
+
+  const content = document.createElement("div");
+  content.className = "emoji-content normal-emojis";
+  emojiPanel.appendChild(content);
+
+  function renderNormalEmojis() {
+    content.className = "emoji-content normal-emojis";
+    content.innerHTML = "";
+    emojis.forEach((emoji) => {
+      const btn = document.createElement("button");
+      btn.textContent = emoji;
+      btn.title = emoji;
+      btn.addEventListener("click", () => {
+        messageInput.value += emoji;
+        messageInput.focus();
+        emojiPanel.remove();
+        emojiPanel = null;
+      });
+      content.appendChild(btn);
     });
-    emojiPanel.appendChild(btn);
+  }
+
+  function renderSuperEmojis() {
+    content.className = "emoji-content super-emojis";
+    content.innerHTML = "";
+    superEmojis.forEach((item) => {
+      const btn = document.createElement("button");
+      btn.className = "super-emoji-btn";
+      btn.textContent = item.emoji;
+      btn.title = item.name;
+      btn.addEventListener("click", () => {
+        sendSticker(item);
+        emojiPanel.remove();
+        emojiPanel = null;
+      });
+      content.appendChild(btn);
+    });
+  }
+
+  normalTab.addEventListener("click", () => {
+    normalTab.classList.add("active");
+    superTab.classList.remove("active");
+    renderNormalEmojis();
   });
+
+  superTab.addEventListener("click", () => {
+    superTab.classList.add("active");
+    normalTab.classList.remove("active");
+    renderSuperEmojis();
+  });
+
+  renderNormalEmojis();
   document.body.appendChild(emojiPanel);
   positionEmojiPanel();
 });
@@ -618,8 +779,19 @@ emojiBtn.addEventListener("click", () => {
 function positionEmojiPanel() {
   if (!emojiPanel) return;
   const rect = emojiBtn.getBoundingClientRect();
-  emojiPanel.style.left = `${rect.left}px`;
-  emojiPanel.style.top = `${rect.top - emojiPanel.offsetHeight - 10}px`;
+  const panelWidth = emojiPanel.offsetWidth || 320;
+  const panelHeight = emojiPanel.offsetHeight || 320;
+  let left = rect.left;
+  let top = rect.top - panelHeight - 10;
+
+  if (left + panelWidth > window.innerWidth - 10) {
+    left = window.innerWidth - panelWidth - 10;
+  }
+  if (left < 10) left = 10;
+  if (top < 10) top = rect.bottom + 10;
+
+  emojiPanel.style.left = `${left}px`;
+  emojiPanel.style.top = `${top}px`;
 }
 
 document.addEventListener("click", (e) => {
