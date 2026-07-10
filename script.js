@@ -201,17 +201,20 @@ messageInput.addEventListener("paste", async (e) => {
 async function uploadImage(file) {
   if (!file || !storage) return;
 
-  if (file.size > 5 * 1024 * 1024) {
-    uploadProgress.textContent = "图片太大，请选 5MB 以内的图片。";
-    return;
-  }
-
-  uploadProgress.textContent = "图片上传中...";
-  const path = `rooms/${ROOM_ID}/images/${Date.now()}_${file.name || "pasted.png"}`;
-  const fileRef = sRef(storage, path);
-
   try {
-    await uploadBytes(fileRef, file);
+    uploadProgress.textContent = "图片压缩中...";
+    const compressed = await compressImage(file, 1280, 0.85);
+
+    uploadProgress.textContent = "图片上传中...";
+    const path = `rooms/${ROOM_ID}/images/${Date.now()}.jpg`;
+    const fileRef = sRef(storage, path);
+
+    const uploadPromise = uploadBytes(fileRef, compressed);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("上传超时，请检查 Firebase Storage 是否已开启")), 15000)
+    );
+
+    await Promise.race([uploadPromise, timeoutPromise]);
     const url = await getDownloadURL(fileRef);
 
     await push(ref(db, `rooms/${ROOM_ID}/messages`), {
@@ -225,8 +228,42 @@ async function uploadImage(file) {
     uploadProgress.textContent = "";
   } catch (err) {
     console.error("图片上传失败", err);
-    uploadProgress.textContent = "图片上传失败，请检查 Firebase Storage 是否已开启。";
+    uploadProgress.textContent = err.message?.includes("超时")
+      ? "上传超时，请检查 Firebase Storage 是否已开启。"
+      : "图片上传失败，请检查网络或 Firebase Storage 设置。";
   }
+}
+
+function compressImage(file, maxWidth = 1280, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("图片压缩失败"));
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => reject(new Error("图片读取失败"));
+    img.src = url;
+  });
 }
 
 // ===================== 8. 接收消息 =====================
