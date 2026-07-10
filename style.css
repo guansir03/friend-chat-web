@@ -36,6 +36,10 @@ html, body {
   box-shadow: var(--shadow);
 }
 
+[hidden] {
+  display: none !important;
+}
+
 /* Setup */
 .setup {
   display: grid;
@@ -67,7 +71,37 @@ html, body {
   margin-bottom: 22px;
 }
 
-.setup-card input {
+.avatar-picker {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.avatar-option {
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.2s;
+  display: grid;
+  place-items: center;
+}
+
+.avatar-option:hover {
+  transform: scale(1.1);
+}
+
+.avatar-option.selected {
+  border-color: #4ade80;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.setup-card input[type="text"] {
   width: 100%;
   padding: 14px 18px;
   border: none;
@@ -112,10 +146,6 @@ html, body {
   min-height: 20px;
 }
 
-[hidden] {
-  display: none !important;
-}
-
 /* Chat */
 .chat {
   display: flex;
@@ -142,6 +172,7 @@ html, body {
   font-size: 24px;
   background: rgba(255, 255, 255, 0.25);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
 }
 
 .header-info {
@@ -221,25 +252,44 @@ html, body {
   margin-bottom: 8px;
 }
 
+.message-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 85%;
+  animation: popIn 0.25s ease-out;
+}
+
+.message-row.mine {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.message-row.theirs {
+  align-self: flex-start;
+}
+
+.message-row .avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+}
+
 .message {
-  max-width: 78%;
   padding: 12px 16px;
   border-radius: var(--radius);
   font-size: 15px;
   line-height: 1.5;
   word-wrap: break-word;
-  animation: popIn 0.25s ease-out;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .message.mine {
-  align-self: flex-end;
   background: var(--mine);
   border-bottom-right-radius: 6px;
 }
 
 .message.theirs {
-  align-self: flex-start;
   background: var(--theirs);
   border: 1px solid var(--glass-border);
   border-bottom-left-radius: 6px;
@@ -250,6 +300,18 @@ html, body {
   font-weight: 600;
   color: rgba(255, 255, 255, 0.85);
   margin-bottom: 4px;
+}
+
+.message .content {
+  max-width: 100%;
+}
+
+.message img {
+  max-width: 240px;
+  max-height: 240px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: block;
 }
 
 .message time {
@@ -316,6 +378,7 @@ html, body {
 }
 
 .emoji-btn,
+.image-btn,
 .send-btn {
   width: 42px;
   height: 42px;
@@ -331,6 +394,7 @@ html, body {
 }
 
 .emoji-btn:hover,
+.image-btn:hover,
 .send-btn:hover {
   background: rgba(255, 255, 255, 0.12);
 }
@@ -348,6 +412,10 @@ html, body {
   background: #4338ca;
 }
 
+.image-btn input {
+  display: none;
+}
+
 #messageInput {
   flex: 1;
   border: none;
@@ -360,6 +428,14 @@ html, body {
 
 #messageInput::placeholder {
   color: var(--text-muted);
+}
+
+.upload-progress {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  min-height: 18px;
 }
 
 .hint {
@@ -387,8 +463,13 @@ html, body {
     max-width: 100%;
   }
 
-  .message {
-    max-width: 85%;
+  .message-row {
+    max-width: 92%;
+  }
+
+  .message img {
+    max-width: 180px;
+    max-height: 180px;
   }
 
   .setup-card {

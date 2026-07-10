@@ -13,7 +13,11 @@
     <div class="setup" id="setup">
       <div class="setup-card">
         <h2>👋 欢迎来到 Friend Chat</h2>
-        <p>请输入一个昵称，开始和朋友聊天。</p>
+        <p>请选择头像、输入昵称，开始和朋友聊天。</p>
+
+        <div class="avatar-picker" id="avatarPicker"></div>
+        <input type="hidden" id="avatarInput" value="🐱" />
+
         <input type="text" id="nameInput" placeholder="你的昵称" maxlength="16" />
         <button id="startBtn">进入聊天室</button>
         <div class="setup-hint" id="setupHint"></div>
@@ -23,9 +27,9 @@
     <!-- Chat screen -->
     <div class="chat" id="chat" hidden>
       <header class="chat-header">
-        <div class="avatar" id="friendAvatar">🧸</div>
+        <div class="avatar" id="friendAvatar">👥</div>
         <div class="header-info">
-          <h1 id="chatTitle">朋友</h1>
+          <h1 id="chatTitle">聊天室</h1>
           <span class="status" id="status">在线</span>
         </div>
         <button class="notify-btn" id="notifyBtn" title="开启消息通知">🔔</button>
@@ -43,6 +47,10 @@
       <footer class="chat-footer">
         <div class="input-area">
           <button class="emoji-btn" id="emojiBtn" title="表情">😊</button>
+          <label class="image-btn" id="imageBtn" title="发送图片">
+            📷
+            <input type="file" id="imageInput" accept="image/*" hidden />
+          </label>
           <input
             type="text"
             id="messageInput"
@@ -51,7 +59,8 @@
           />
           <button class="send-btn" id="sendBtn" title="发送">➤</button>
         </div>
-        <div class="hint">按 Enter 发送 · 点击铃铛开启桌面通知</div>
+        <div class="upload-progress" id="uploadProgress"></div>
+        <div class="hint">按 Enter 发送 · 点击铃铛开启桌面通知 · 支持发送图片</div>
       </footer>
     </div>
   </div>

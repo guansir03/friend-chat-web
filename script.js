@@ -8,8 +8,14 @@ import {
   query,
   limitToLast,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {
+  getStorage,
+  ref as sRef,
+  uploadBytes,
+  getDownloadURL,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-// ===================== 1. 替换为你的 Firebase 配置 =====================
+// ===================== 1. Firebase 配置 =====================
 const firebaseConfig = {
   apiKey: "AIzaSyAYUMg9oxmP05bcowL-Vi9dFdDqd87ePLQ",
   authDomain: "friend-chat-web-c40cf.firebaseapp.com",
@@ -20,15 +26,17 @@ const firebaseConfig = {
   appId: "1:306817136268:web:cc04578d785193c8e5ada9",
 };
 
-const ROOM_ID = "friend-chat-room"; // 你和朋友的房间号，可改
+const ROOM_ID = "friend-chat-room";
 
 // ===================== 2. 初始化 =====================
 let app;
 let db;
+let storage;
 let messagesRef;
 try {
   app = initializeApp(firebaseConfig);
   db = getDatabase(app);
+  storage = getStorage(app);
   messagesRef = query(ref(db, `rooms/${ROOM_ID}/messages`), limitToLast(100));
 } catch (e) {
   console.error("Firebase 初始化失败，请检查 firebaseConfig", e);
@@ -38,6 +46,8 @@ try {
 const setupEl = document.getElementById("setup");
 const chatEl = document.getElementById("chat");
 const nameInput = document.getElementById("nameInput");
+const avatarInput = document.getElementById("avatarInput");
+const avatarPicker = document.getElementById("avatarPicker");
 const startBtn = document.getElementById("startBtn");
 const setupHint = document.getElementById("setupHint");
 
@@ -49,17 +59,34 @@ const notifyBtn = document.getElementById("notifyBtn");
 const typingEl = document.getElementById("typing");
 const statusEl = document.getElementById("status");
 const emojiBtn = document.getElementById("emojiBtn");
+const imageInput = document.getElementById("imageInput");
+const uploadProgress = document.getElementById("uploadProgress");
 
 let myName = "";
+let myAvatar = "🐱";
 let notificationsEnabled = false;
 let unreadCount = 0;
 let originalTitle = document.title;
 let isPageVisible = true;
-let lastTypingSent = 0;
 
 const emojis = ["😀", "😂", "🥰", "😎", "😭", "😡", "👍", "❤️", "🎉", "🤔", "👀", "🙏"];
+const avatars = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🐸", "🐙", "🦄", "🐲", "👽"];
 
-// ===================== 4. 进入聊天室 =====================
+// ===================== 4. 头像选择器 =====================
+avatars.forEach((a) => {
+  const btn = document.createElement("div");
+  btn.className = "avatar-option";
+  btn.textContent = a;
+  if (a === myAvatar) btn.classList.add("selected");
+  btn.addEventListener("click", () => {
+    avatarPicker.querySelectorAll(".avatar-option").forEach((b) => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    avatarInput.value = a;
+  });
+  avatarPicker.appendChild(btn);
+});
+
+// ===================== 5. 进入聊天室 =====================
 startBtn.addEventListener("click", enterChat);
 nameInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") enterChat();
@@ -77,32 +104,36 @@ function enterChat() {
     return;
   }
   myName = name;
+  myAvatar = avatarInput.value || "🐱";
   setupEl.hidden = true;
   chatEl.hidden = false;
   document.getElementById("chatTitle").textContent = myName;
+  document.getElementById("friendAvatar").textContent = myAvatar;
   messageInput.focus();
   listenMessages();
   requestNotificationPermission();
 }
 
-// ===================== 5. 发送消息 =====================
+// ===================== 6. 发送文字消息 =====================
 function sendMessage() {
   const text = messageInput.value.trim();
   if (!text || !db) return;
   messageInput.value = "";
 
   push(ref(db, `rooms/${ROOM_ID}/messages`), {
+    type: "text",
     text,
     sender: myName,
+    avatar: myAvatar,
     timestamp: serverTimestamp(),
   }).catch((err) => {
     console.error("发送失败", err);
     appendSystemMsg("消息发送失败，请检查网络或 Firebase 配置。");
   });
 
-  // 简单的“正在输入”信号
   push(ref(db, `rooms/${ROOM_ID}/typing`), {
     sender: myName,
+    avatar: myAvatar,
     timestamp: serverTimestamp(),
   }).catch(() => {});
 }
@@ -112,7 +143,42 @@ messageInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendMessage();
 });
 
-// ===================== 6. 接收消息 =====================
+// ===================== 7. 发送图片 =====================
+imageInput.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file || !storage) return;
+
+  if (file.size > 5 * 1024 * 1024) {
+    uploadProgress.textContent = "图片太大，请选 5MB 以内的图片。";
+    imageInput.value = "";
+    return;
+  }
+
+  uploadProgress.textContent = "图片上传中...";
+  const path = `rooms/${ROOM_ID}/images/${Date.now()}_${file.name}`;
+  const fileRef = sRef(storage, path);
+
+  try {
+    await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(fileRef);
+
+    await push(ref(db, `rooms/${ROOM_ID}/messages`), {
+      type: "image",
+      imageUrl: url,
+      sender: myName,
+      avatar: myAvatar,
+      timestamp: serverTimestamp(),
+    });
+
+    uploadProgress.textContent = "";
+  } catch (err) {
+    console.error("图片上传失败", err);
+    uploadProgress.textContent = "图片上传失败，请检查 Firebase Storage 是否已开启。";
+  }
+  imageInput.value = "";
+});
+
+// ===================== 8. 接收消息 =====================
 function listenMessages() {
   if (!messagesRef) return;
 
@@ -120,20 +186,20 @@ function listenMessages() {
     const data = snapshot.val();
     if (!data) return;
 
-    const isMine = data.sender === myName;
-    appendMessage(data.text, data.sender, isMine, data.timestamp);
+    const isMine = data.sender === myName && data.avatar === myAvatar;
+    appendMessage(data, isMine);
 
     if (!isMine) {
       playMessageSound();
       if (!isPageVisible) {
         unreadCount++;
         updateTitle();
-        showNotification(data.sender || "朋友", data.text);
+        const notifyBody = data.type === "image" ? "[图片]" : data.text || "新消息";
+        showNotification(data.sender || "朋友", notifyBody);
       }
     }
   });
 
-  // 监听“正在输入”
   const typingRef = query(ref(db, `rooms/${ROOM_ID}/typing`), limitToLast(1));
   onChildAdded(typingRef, (snapshot) => {
     const data = snapshot.val();
@@ -149,14 +215,46 @@ function listenMessages() {
   });
 }
 
-// ===================== 7. UI 渲染 =====================
-function appendMessage(text, sender, isMine, ts) {
+// ===================== 9. UI 渲染 =====================
+function appendMessage(data, isMine) {
+  const row = document.createElement("div");
+  row.className = `message-row ${isMine ? "mine" : "theirs"}`;
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = data.avatar || "🧸";
+
   const msg = document.createElement("div");
   msg.className = `message ${isMine ? "mine" : "theirs"}`;
-  const timeStr = ts ? formatTime(new Date(ts)) : formatTime(new Date());
-  const senderHtml = isMine ? "" : `<div class="sender">${escapeHtml(sender || "朋友")}</div>`;
-  msg.innerHTML = `${senderHtml}<div>${escapeHtml(text)}</div><time>${timeStr}</time>`;
-  messagesEl.appendChild(msg);
+
+  const sender = document.createElement("div");
+  sender.className = "sender";
+  sender.textContent = data.sender || "朋友";
+
+  const content = document.createElement("div");
+  content.className = "content";
+
+  if (data.type === "image" && data.imageUrl) {
+    const img = document.createElement("img");
+    img.src = data.imageUrl;
+    img.alt = "图片";
+    img.loading = "lazy";
+    img.addEventListener("click", () => window.open(data.imageUrl, "_blank"));
+    content.appendChild(img);
+  } else {
+    content.textContent = data.text || "";
+  }
+
+  const time = document.createElement("time");
+  time.textContent = data.timestamp ? formatTime(new Date(data.timestamp)) : formatTime(new Date());
+
+  msg.appendChild(sender);
+  msg.appendChild(content);
+  msg.appendChild(time);
+
+  row.appendChild(avatar);
+  row.appendChild(msg);
+  messagesEl.appendChild(row);
   scrollToBottom();
 }
 
@@ -172,17 +270,11 @@ function formatTime(date) {
   return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
-}
-
 function scrollToBottom() {
   chatMain.scrollTo({ top: chatMain.scrollHeight, behavior: "smooth" });
 }
 
-// ===================== 8. 通知与标题 =====================
+// ===================== 10. 通知与标题 =====================
 async function requestNotificationPermission() {
   if (!("Notification" in window)) return;
   const permission = await Notification.requestPermission();
@@ -227,7 +319,7 @@ function updateTitle() {
     : originalTitle;
 }
 
-// ===================== 9. 提示音 =====================
+// ===================== 11. 提示音 =====================
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function playMessageSound() {
   if (audioCtx.state === "suspended") audioCtx.resume();
@@ -244,7 +336,7 @@ function playMessageSound() {
   osc.stop(audioCtx.currentTime + 0.15);
 }
 
-// ===================== 10. 表情面板 =====================
+// ===================== 12. 表情面板 =====================
 let emojiPanel = null;
 emojiBtn.addEventListener("click", () => {
   if (emojiPanel) {
