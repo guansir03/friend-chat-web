@@ -112,6 +112,10 @@ html, body {
   min-height: 20px;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 /* Chat */
 .chat {
   display: flex;

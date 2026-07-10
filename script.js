@@ -79,6 +79,7 @@ function enterChat() {
   myName = name;
   setupEl.hidden = true;
   chatEl.hidden = false;
+  document.getElementById("chatTitle").textContent = myName;
   messageInput.focus();
   listenMessages();
   requestNotificationPermission();
