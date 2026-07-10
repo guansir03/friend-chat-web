@@ -31,6 +31,7 @@
           <span class="status" id="status">在线</span>
         </div>
         <div class="header-actions">
+          <button class="history-btn" id="historyBtn" title="历史记录">📜</button>
           <button class="notify-btn" id="notifyBtn" title="开启消息通知">🔔</button>
           <button class="test-notify-btn" id="testNotifyBtn" hidden>测试通知</button>
         </div>
@@ -83,6 +84,20 @@
     <div class="image-modal-content">
       <button class="image-modal-close" id="imageModalClose" title="关闭">✕</button>
       <img id="imageModalImg" src="" alt="预览" />
+    </div>
+  </div>
+
+  <!-- 历史记录面板 -->
+  <div class="history-panel" id="historyPanel" hidden>
+    <div class="history-panel-backdrop"></div>
+    <div class="history-panel-content">
+      <header class="history-panel-header">
+        <h2>📜 历史记录</h2>
+        <button class="history-panel-close" id="historyPanelClose" title="关闭">✕</button>
+      </header>
+      <div class="history-list" id="historyList">
+        <div class="history-empty">加载中...</div>
+      </div>
     </div>
   </div>
 

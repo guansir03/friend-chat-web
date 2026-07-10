@@ -3,6 +3,7 @@ import {
   getDatabase,
   ref,
   push,
+  get,
   onChildAdded,
   serverTimestamp,
   query,
@@ -29,7 +30,7 @@ let messagesRef;
 try {
   app = initializeApp(firebaseConfig);
   db = getDatabase(app);
-  messagesRef = query(ref(db, `rooms/${ROOM_ID}/messages`), limitToLast(100));
+  messagesRef = query(ref(db, `rooms/${ROOM_ID}/messages`), limitToLast(500));
 } catch (e) {
   console.error("Firebase 初始化失败，请检查 firebaseConfig", e);
 }
@@ -58,6 +59,11 @@ const previewImg = document.getElementById("previewImg");
 const removePreview = document.getElementById("removePreview");
 const uploadProgress = document.getElementById("uploadProgress");
 const testNotifyBtn = document.getElementById("testNotifyBtn");
+const historyBtn = document.getElementById("historyBtn");
+const historyPanel = document.getElementById("historyPanel");
+const historyPanelClose = document.getElementById("historyPanelClose");
+const historyPanelBackdrop = document.querySelector(".history-panel-backdrop");
+const historyList = document.getElementById("historyList");
 const imageModal = document.getElementById("imageModal");
 const imageModalImg = document.getElementById("imageModalImg");
 const imageModalClose = document.getElementById("imageModalClose");
@@ -219,6 +225,102 @@ document.addEventListener("keydown", (e) => {
     closeImageModal();
   }
 });
+
+// ===================== 历史记录面板 =====================
+historyBtn.addEventListener("click", openHistoryPanel);
+historyPanelClose.addEventListener("click", closeHistoryPanel);
+historyPanelBackdrop.addEventListener("click", closeHistoryPanel);
+
+function openHistoryPanel() {
+  historyPanel.hidden = false;
+  loadHistory();
+}
+
+function closeHistoryPanel() {
+  historyPanel.hidden = true;
+}
+
+async function loadHistory() {
+  if (!db) return;
+  historyList.innerHTML = '<div class="history-empty">加载中...</div>';
+
+  try {
+    const snapshot = await get(query(ref(db, `rooms/${ROOM_ID}/messages`), limitToLast(500)));
+    const data = snapshot.val();
+    if (!data) {
+      historyList.innerHTML = '<div class="history-empty">暂无历史记录</div>';
+      return;
+    }
+
+    const messages = Object.values(data).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    renderHistory(messages);
+  } catch (err) {
+    console.error("加载历史记录失败", err);
+    historyList.innerHTML = '<div class="history-empty">加载失败</div>';
+  }
+}
+
+function renderHistory(messages) {
+  historyList.innerHTML = "";
+  let lastDate = "";
+
+  messages.forEach((msg) => {
+    const date = msg.timestamp ? formatDate(new Date(msg.timestamp)) : "未知日期";
+    if (date !== lastDate) {
+      const dateDiv = document.createElement("div");
+      dateDiv.className = "history-date";
+      dateDiv.textContent = date;
+      historyList.appendChild(dateDiv);
+      lastDate = date;
+    }
+
+    const item = document.createElement("div");
+    item.className = "history-item";
+
+    const avatar = document.createElement("div");
+    avatar.className = "history-item-avatar";
+    avatar.textContent = msg.avatar || "🧸";
+
+    const body = document.createElement("div");
+    body.className = "history-item-body";
+
+    const sender = document.createElement("div");
+    sender.className = "history-item-sender";
+    const time = msg.timestamp ? formatTime(new Date(msg.timestamp)) : "";
+    sender.innerHTML = `${escapeHtml(msg.sender || "朋友")}<span class="history-item-time">${time}</span>`;
+
+    if (msg.text) {
+      const textDiv = document.createElement("div");
+      textDiv.className = "history-item-text";
+      textDiv.textContent = msg.text;
+      body.appendChild(textDiv);
+    }
+
+    if (msg.imageUrl) {
+      const img = document.createElement("img");
+      img.src = msg.imageUrl;
+      img.alt = "图片";
+      img.addEventListener("click", () => openImageModal(msg.imageUrl));
+      body.appendChild(img);
+    }
+
+    body.insertBefore(sender, body.firstChild);
+    item.appendChild(avatar);
+    item.appendChild(body);
+    historyList.appendChild(item);
+  });
+}
+
+function formatDate(date) {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const dStr = date.toLocaleDateString("zh-CN");
+  if (dStr === today.toLocaleDateString("zh-CN")) return "今天";
+  if (dStr === yesterday.toLocaleDateString("zh-CN")) return "昨天";
+  return date.toLocaleDateString("zh-CN", { month: "long", day: "numeric" });
+}
 
 function showNotification(title, body) {
   if (!notificationsEnabled || isPageVisible) return;
