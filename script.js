@@ -180,16 +180,34 @@ messageInput.addEventListener("keydown", (e) => {
 // ===================== 7. 发送图片 =====================
 imageInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
+  await uploadImage(file);
+  imageInput.value = "";
+});
+
+messageInput.addEventListener("paste", async (e) => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf("image") !== -1) {
+      e.preventDefault();
+      const file = items[i].getAsFile();
+      if (file) await uploadImage(file);
+      return;
+    }
+  }
+});
+
+async function uploadImage(file) {
   if (!file || !storage) return;
 
   if (file.size > 5 * 1024 * 1024) {
     uploadProgress.textContent = "图片太大，请选 5MB 以内的图片。";
-    imageInput.value = "";
     return;
   }
 
   uploadProgress.textContent = "图片上传中...";
-  const path = `rooms/${ROOM_ID}/images/${Date.now()}_${file.name}`;
+  const path = `rooms/${ROOM_ID}/images/${Date.now()}_${file.name || "pasted.png"}`;
   const fileRef = sRef(storage, path);
 
   try {
@@ -209,8 +227,7 @@ imageInput.addEventListener("change", async (e) => {
     console.error("图片上传失败", err);
     uploadProgress.textContent = "图片上传失败，请检查 Firebase Storage 是否已开启。";
   }
-  imageInput.value = "";
-});
+}
 
 // ===================== 8. 接收消息 =====================
 function listenMessages() {
