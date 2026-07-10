@@ -8,12 +8,6 @@ import {
   query,
   limitToLast,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-import {
-  getStorage,
-  ref as sRef,
-  uploadBytes,
-  getDownloadURL,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 // ===================== 1. Firebase 配置 =====================
 const firebaseConfig = {
@@ -31,12 +25,10 @@ const ROOM_ID = "friend-chat-room";
 // ===================== 2. 初始化 =====================
 let app;
 let db;
-let storage;
 let messagesRef;
 try {
   app = initializeApp(firebaseConfig);
   db = getDatabase(app);
-  storage = getStorage(app);
   messagesRef = query(ref(db, `rooms/${ROOM_ID}/messages`), limitToLast(100));
 } catch (e) {
   console.error("Firebase 初始化失败，请检查 firebaseConfig", e);
@@ -199,27 +191,22 @@ messageInput.addEventListener("paste", async (e) => {
 });
 
 async function uploadImage(file) {
-  if (!file || !storage) return;
+  if (!file || !db) return;
 
   try {
     uploadProgress.textContent = "图片压缩中...";
-    const compressed = await compressImage(file, 1280, 0.85);
+    const dataUrl = await compressImage(file, 1280, 0.8);
 
-    uploadProgress.textContent = "图片上传中...";
-    const path = `rooms/${ROOM_ID}/images/${Date.now()}.jpg`;
-    const fileRef = sRef(storage, path);
+    // base64 比原图大约 33%，RTDB 单节点建议控制在 1.5MB 以内
+    if (dataUrl.length > 1.5 * 1024 * 1024) {
+      uploadProgress.textContent = "图片压缩后仍太大，请选更小的图片。";
+      return;
+    }
 
-    const uploadPromise = uploadBytes(fileRef, compressed);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("上传超时，请检查 Firebase Storage 是否已开启")), 15000)
-    );
-
-    await Promise.race([uploadPromise, timeoutPromise]);
-    const url = await getDownloadURL(fileRef);
-
+    uploadProgress.textContent = "图片发送中...";
     await push(ref(db, `rooms/${ROOM_ID}/messages`), {
       type: "image",
-      imageUrl: url,
+      imageUrl: dataUrl,
       sender: myName,
       avatar: myAvatar,
       timestamp: serverTimestamp(),
@@ -227,14 +214,12 @@ async function uploadImage(file) {
 
     uploadProgress.textContent = "";
   } catch (err) {
-    console.error("图片上传失败", err);
-    uploadProgress.textContent = err.message?.includes("超时")
-      ? "上传超时，请检查 Firebase Storage 是否已开启。"
-      : "图片上传失败，请检查网络或 Firebase Storage 设置。";
+    console.error("图片发送失败", err);
+    uploadProgress.textContent = "图片发送失败，请检查网络。";
   }
 }
 
-function compressImage(file, maxWidth = 1280, quality = 0.85) {
+function compressImage(file, maxWidth = 1280, quality = 0.8) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -252,14 +237,8 @@ function compressImage(file, maxWidth = 1280, quality = 0.85) {
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error("图片压缩失败"));
-        },
-        "image/jpeg",
-        quality
-      );
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      resolve(dataUrl);
     };
     img.onerror = () => reject(new Error("图片读取失败"));
     img.src = url;

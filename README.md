@@ -7,7 +7,7 @@
 - 💅 现代玻璃拟态 UI，适配桌面与移动端
 - 👤 进入时选择头像 + 输入昵称
 - 💬 基于 Firebase Realtime Database 的**多人实时聊天**
-- 🖼️ 发送图片（使用 Firebase Storage）
+- 🖼️ 发送图片（压缩后以 base64 存入 Realtime Database，无需额外 Storage）
 - 🔔 浏览器/系统桌面通知
 - 🔊 新消息提示音
 - 😊 表情选择器
@@ -26,7 +26,8 @@ Firebase Spark（免费版）Realtime Database 默认支持最多 **10 万同时
 3. 进入项目后，点击左侧 ⚙️ → **项目设置** → **应用** → **</>** 添加 Web 应用。
 4. 注册应用后，复制 Firebase 提供的 `firebaseConfig` 对象。
 5. 进入左侧 **Realtime Database** → **创建数据库** → 选择地区 → **测试模式**（公开读写，适合 Demo）。
-6. 进入左侧 **Storage**（存储）→ **开始使用** → 选择地区 → **测试模式**（允许公开上传图片）。
+
+> 图片会直接以压缩后的 base64 形式存入 Realtime Database，不需要额外开启 Firebase Storage。
 
 ### 2. 替换配置
 
@@ -52,7 +53,7 @@ py -m http.server 8080
 ## 安全提示
 
 - Demo 使用 Firebase 的“测试模式”（公开读写），仅适合熟人小范围使用。
-- 如需更高安全性，可启用 Firebase Authentication 并配置数据库和存储安全规则。
+- 如需更高安全性，可启用 Firebase Authentication 并配置数据库安全规则。
 
 ## 文件结构
 
