@@ -3,7 +3,6 @@ import {
   getDatabase,
   ref,
   push,
-  get,
   onChildAdded,
   serverTimestamp,
   query,
@@ -76,6 +75,7 @@ let unreadCount = 0;
 let originalTitle = document.title;
 let isPageVisible = true;
 let pendingImage = null; // 待发送的图片 dataUrl
+let messageHistory = []; // 用于历史记录展示
 
 const emojis = ["😀", "😂", "🥰", "😎", "😭", "😡", "👍", "❤️", "🎉", "🤔", "👀", "🙏"];
 const avatars = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🐸", "🐙", "🦄", "🐲", "👽"];
@@ -240,24 +240,12 @@ function closeHistoryPanel() {
   historyPanel.hidden = true;
 }
 
-async function loadHistory() {
-  if (!db) return;
-  historyList.innerHTML = '<div class="history-empty">加载中...</div>';
-
-  try {
-    const snapshot = await get(query(ref(db, `rooms/${ROOM_ID}/messages`), limitToLast(500)));
-    const data = snapshot.val();
-    if (!data) {
-      historyList.innerHTML = '<div class="history-empty">暂无历史记录</div>';
-      return;
-    }
-
-    const messages = Object.values(data).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    renderHistory(messages);
-  } catch (err) {
-    console.error("加载历史记录失败", err);
-    historyList.innerHTML = '<div class="history-empty">加载失败</div>';
+function loadHistory() {
+  if (messageHistory.length === 0) {
+    historyList.innerHTML = '<div class="history-empty">暂无历史记录</div>';
+    return;
   }
+  renderHistory(messageHistory);
 }
 
 function renderHistory(messages) {
@@ -482,6 +470,8 @@ function listenMessages() {
   onChildAdded(messagesRef, (snapshot) => {
     const data = snapshot.val();
     if (!data) return;
+
+    messageHistory.push(data);
 
     const isMine = data.sender === myName && data.avatar === myAvatar;
     appendMessage(data, isMine);
