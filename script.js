@@ -71,6 +71,7 @@ let isPageVisible = true;
 
 const emojis = ["😀", "😂", "🥰", "😎", "😭", "😡", "👍", "❤️", "🎉", "🤔", "👀", "🙏"];
 const avatars = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🐸", "🐙", "🦄", "🐲", "👽"];
+const IDENTITY_KEY = "friend-chat-identity";
 
 // ===================== 4. 头像选择器 =====================
 avatars.forEach((a) => {
@@ -92,6 +93,9 @@ nameInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") enterChat();
 });
 
+// 页面加载后，如果本地保存了身份，自动进入聊天室
+tryAutoLogin();
+
 function enterChat() {
   const name = nameInput.value.trim();
   if (!name) {
@@ -105,6 +109,7 @@ function enterChat() {
   }
   myName = name;
   myAvatar = avatarInput.value || "🐱";
+  saveIdentity(myName, myAvatar);
   setupEl.hidden = true;
   chatEl.hidden = false;
   document.getElementById("chatTitle").textContent = myName;
@@ -112,6 +117,35 @@ function enterChat() {
   messageInput.focus();
   listenMessages();
   requestNotificationPermission();
+}
+
+function saveIdentity(name, avatar) {
+  try {
+    localStorage.setItem(IDENTITY_KEY, JSON.stringify({ name, avatar }));
+  } catch (e) {
+    console.warn("保存身份信息失败", e);
+  }
+}
+
+function loadIdentity() {
+  try {
+    const data = localStorage.getItem(IDENTITY_KEY);
+    return data ? JSON.parse(data) : null;
+  } catch (e) {
+    console.warn("读取身份信息失败", e);
+    return null;
+  }
+}
+
+function tryAutoLogin() {
+  const saved = loadIdentity();
+  if (!saved || !saved.name) return;
+  nameInput.value = saved.name;
+  avatarInput.value = saved.avatar;
+  avatarPicker.querySelectorAll(".avatar-option").forEach((b) => {
+    b.classList.toggle("selected", b.textContent === saved.avatar);
+  });
+  enterChat();
 }
 
 // ===================== 6. 发送文字消息 =====================
