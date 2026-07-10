@@ -8,64 +8,86 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app">
+  <div class="qq-app" id="qqApp">
     <!-- Setup screen -->
     <div class="setup" id="setup">
       <div class="setup-card">
-        <h2>👋 欢迎来到 Friend Chat</h2>
-        <p>请选择头像、输入昵称，开始和朋友聊天。</p>
-
+        <h2>👋 登录 Friend Chat</h2>
+        <p>选择头像、输入昵称，进入聊天室。</p>
         <div class="avatar-picker" id="avatarPicker"></div>
         <input type="hidden" id="avatarInput" value="🐱" />
-
         <input type="text" id="nameInput" placeholder="你的昵称" maxlength="16" />
         <button id="startBtn">进入聊天室</button>
         <div class="setup-hint" id="setupHint"></div>
       </div>
     </div>
 
-    <!-- Chat screen -->
-    <div class="chat" id="chat" hidden>
-      <header class="chat-header">
-        <div class="avatar" id="friendAvatar">👥</div>
-        <div class="header-info">
-          <h1 id="chatTitle">聊天室</h1>
-          <span class="status" id="status">在线</span>
+    <!-- Main QQ-like UI -->
+    <div class="qq-layout" id="chat" hidden>
+      <!-- Left sidebar -->
+      <aside class="qq-sidebar">
+        <div class="qq-sidebar-header">
+          <div class="qq-avatar" id="myAvatar">🐱</div>
+          <div class="qq-my-name" id="myNameDisplay">我</div>
         </div>
-        <button class="notify-btn" id="notifyBtn" title="开启消息通知">🔔</button>
-      </header>
+        <div class="qq-session-list">
+          <div class="qq-session active">
+            <div class="qq-session-avatar">👥</div>
+            <div class="qq-session-info">
+              <div class="qq-session-title">朋友聊天室</div>
+              <div class="qq-session-last">在线</div>
+            </div>
+          </div>
+        </div>
+      </aside>
 
-      <main class="chat-main" id="chatMain">
-        <div class="messages" id="messages">
-          <div class="system-msg">欢迎来到你们的专属聊天室 💬</div>
+      <!-- Chat area -->
+      <main class="qq-chat">
+        <header class="qq-chat-header">
+          <div class="qq-chat-title">朋友聊天室</div>
+          <div class="qq-chat-actions">
+            <button class="qq-action-btn" id="notifyBtn" title="开启消息通知">🔔</button>
+            <button class="qq-action-btn" title="更多">⋮</button>
+          </div>
+        </header>
+
+        <div class="qq-notice" id="noticeBanner" hidden>
+          <span>📢 桌面通知未开启，新消息可能无法提醒。</span>
+          <button id="enableNotifyBtn">去开启</button>
         </div>
-        <div class="typing" id="typing" hidden>
+
+        <div class="qq-messages" id="messages">
+          <div class="qq-system-msg">欢迎来到聊天室 💬</div>
+        </div>
+
+        <div class="qq-typing" id="typing" hidden>
           <span></span><span></span><span></span>
         </div>
-      </main>
 
-      <footer class="chat-footer">
-        <div class="input-area">
-          <button class="emoji-btn" id="emojiBtn" title="表情">😊</button>
-          <label class="image-btn" id="imageBtn" title="发送图片">
-            📷
-            <input type="file" id="imageInput" accept="image/*" hidden />
-          </label>
-          <input
-            type="text"
+        <footer class="qq-input-area">
+          <div class="qq-toolbar">
+            <button class="qq-tool-btn" id="emojiBtn" title="表情">😊</button>
+            <label class="qq-tool-btn" id="imageBtn" title="发送图片">
+              📷
+              <input type="file" id="imageInput" accept="image/*" hidden />
+            </label>
+            <button class="qq-tool-btn" title="截图">✂️</button>
+          </div>
+          <textarea
+            class="qq-textarea"
             id="messageInput"
             placeholder="输入消息..."
-            autocomplete="off"
-          />
-          <button class="send-btn" id="sendBtn" title="发送">➤</button>
-        </div>
-        <div class="upload-progress" id="uploadProgress"></div>
-        <div class="hint">按 Enter 发送 · 点击铃铛开启桌面通知 · 支持发送图片</div>
-      </footer>
+            rows="3"
+          ></textarea>
+          <div class="qq-send-bar">
+            <span class="qq-upload-progress" id="uploadProgress"></span>
+            <button class="qq-send-btn" id="sendBtn">发送(S)</button>
+          </div>
+        </footer>
+      </main>
     </div>
   </div>
 
-  <!-- Firebase -->
   <script type="module" src="script.js"></script>
 </body>
 </html>

@@ -43,13 +43,17 @@ const avatarPicker = document.getElementById("avatarPicker");
 const startBtn = document.getElementById("startBtn");
 const setupHint = document.getElementById("setupHint");
 
+const myAvatarEl = document.getElementById("myAvatar");
+const myNameDisplayEl = document.getElementById("myNameDisplay");
+
 const messagesEl = document.getElementById("messages");
-const chatMain = document.getElementById("chatMain");
 const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
 const notifyBtn = document.getElementById("notifyBtn");
+const noticeBanner = document.getElementById("noticeBanner");
+const enableNotifyBtn = document.getElementById("enableNotifyBtn");
 const typingEl = document.getElementById("typing");
-const statusEl = document.getElementById("status");
+const statusEl = document.querySelector(".qq-session-last");
 const emojiBtn = document.getElementById("emojiBtn");
 const imageInput = document.getElementById("imageInput");
 const uploadProgress = document.getElementById("uploadProgress");
@@ -85,9 +89,6 @@ nameInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") enterChat();
 });
 
-// 页面加载后，如果本地保存了身份，自动进入聊天室
-tryAutoLogin();
-
 function enterChat() {
   const name = nameInput.value.trim();
   if (!name) {
@@ -102,13 +103,15 @@ function enterChat() {
   myName = name;
   myAvatar = avatarInput.value || "🐱";
   saveIdentity(myName, myAvatar);
+
   setupEl.hidden = true;
   chatEl.hidden = false;
-  document.getElementById("chatTitle").textContent = myName;
-  document.getElementById("friendAvatar").textContent = myAvatar;
+  myAvatarEl.textContent = myAvatar;
+  myNameDisplayEl.textContent = myName;
+
   messageInput.focus();
   listenMessages();
-  requestNotificationPermission();
+  setupNotifications();
 }
 
 function saveIdentity(name, avatar) {
@@ -140,7 +143,77 @@ function tryAutoLogin() {
   enterChat();
 }
 
-// ===================== 6. 发送文字消息 =====================
+// 页面加载后自动登录
+tryAutoLogin();
+
+// ===================== 6. 通知 =====================
+async function setupNotifications() {
+  if (!("Notification" in window)) return;
+
+  const permission = await Notification.requestPermission();
+  updateNotifyState(permission === "granted");
+
+  // 如果还没允许，显示提示条
+  if (permission !== "granted") {
+    noticeBanner.hidden = false;
+  }
+}
+
+function updateNotifyState(enabled) {
+  notificationsEnabled = enabled;
+  if (enabled) {
+    notifyBtn.classList.add("enabled");
+    notifyBtn.title = "消息通知已开启";
+    noticeBanner.hidden = true;
+  } else {
+    notifyBtn.classList.remove("enabled");
+    notifyBtn.title = "消息通知未开启";
+  }
+}
+
+notifyBtn.addEventListener("click", async () => {
+  if (!("Notification" in window)) return;
+  const permission = await Notification.requestPermission();
+  updateNotifyState(permission === "granted");
+});
+
+enableNotifyBtn.addEventListener("click", async () => {
+  if (!("Notification" in window)) return;
+  const permission = await Notification.requestPermission();
+  updateNotifyState(permission === "granted");
+});
+
+function showNotification(title, body) {
+  if (!notificationsEnabled || isPageVisible) return;
+  if (Notification.permission !== "granted") return;
+  try {
+    new Notification(title, {
+      body,
+      icon: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
+      badge: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
+      tag: "friend-chat-message",
+      requireInteraction: false,
+    });
+  } catch (e) {
+    console.warn("通知显示失败", e);
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  isPageVisible = !document.hidden;
+  if (isPageVisible) {
+    unreadCount = 0;
+    updateTitle();
+  }
+});
+
+function updateTitle() {
+  document.title = unreadCount > 0 && !isPageVisible
+    ? `(${unreadCount}) 新消息 - ${originalTitle}`
+    : originalTitle;
+}
+
+// ===================== 7. 发送文字消息 =====================
 function sendMessage() {
   const text = messageInput.value.trim();
   if (!text || !db) return;
@@ -166,10 +239,14 @@ function sendMessage() {
 
 sendBtn.addEventListener("click", sendMessage);
 messageInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendMessage();
+  // QQ 风格：Ctrl+Enter 发送，Enter 换行
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    sendMessage();
+  }
 });
 
-// ===================== 7. 发送图片 =====================
+// ===================== 8. 发送图片 =====================
 imageInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
   await uploadImage(file);
@@ -197,7 +274,6 @@ async function uploadImage(file) {
     uploadProgress.textContent = "图片压缩中...";
     const dataUrl = await compressImage(file, 1280, 0.8);
 
-    // base64 比原图大约 33%，RTDB 单节点建议控制在 1.5MB 以内
     if (dataUrl.length > 1.5 * 1024 * 1024) {
       uploadProgress.textContent = "图片压缩后仍太大，请选更小的图片。";
       return;
@@ -245,7 +321,7 @@ function compressImage(file, maxWidth = 1280, quality = 0.8) {
   });
 }
 
-// ===================== 8. 接收消息 =====================
+// ===================== 9. 接收消息 =====================
 function listenMessages() {
   if (!messagesRef) return;
 
@@ -258,6 +334,9 @@ function listenMessages() {
 
     if (!isMine) {
       playMessageSound();
+      statusEl.textContent = `来自 ${data.sender}`;
+      setTimeout(() => (statusEl.textContent = "在线"), 2000);
+
       if (!isPageVisible) {
         unreadCount++;
         updateTitle();
@@ -273,7 +352,6 @@ function listenMessages() {
     if (data && data.sender !== myName) {
       statusEl.textContent = `${data.sender} 正在输入...`;
       typingEl.hidden = false;
-      scrollToBottom();
       setTimeout(() => {
         statusEl.textContent = "在线";
         typingEl.hidden = true;
@@ -282,24 +360,24 @@ function listenMessages() {
   });
 }
 
-// ===================== 9. UI 渲染 =====================
+// ===================== 10. UI 渲染 =====================
 function appendMessage(data, isMine) {
   const row = document.createElement("div");
-  row.className = `message-row ${isMine ? "mine" : "theirs"}`;
+  row.className = `qq-message-row ${isMine ? "mine" : "theirs"}`;
 
   const avatar = document.createElement("div");
-  avatar.className = "avatar";
+  avatar.className = "qq-message-avatar";
   avatar.textContent = data.avatar || "🧸";
 
-  const msg = document.createElement("div");
-  msg.className = `message ${isMine ? "mine" : "theirs"}`;
+  const body = document.createElement("div");
+  body.className = "qq-message-body";
 
   const sender = document.createElement("div");
-  sender.className = "sender";
+  sender.className = "qq-message-sender";
   sender.textContent = data.sender || "朋友";
 
-  const content = document.createElement("div");
-  content.className = "content";
+  const bubble = document.createElement("div");
+  bubble.className = "qq-message-bubble";
 
   if (data.type === "image" && data.imageUrl) {
     const img = document.createElement("img");
@@ -307,27 +385,28 @@ function appendMessage(data, isMine) {
     img.alt = "图片";
     img.loading = "lazy";
     img.addEventListener("click", () => window.open(data.imageUrl, "_blank"));
-    content.appendChild(img);
+    bubble.appendChild(img);
   } else {
-    content.textContent = data.text || "";
+    bubble.textContent = data.text || "";
   }
 
-  const time = document.createElement("time");
+  const time = document.createElement("div");
+  time.className = "qq-message-time";
   time.textContent = data.timestamp ? formatTime(new Date(data.timestamp)) : formatTime(new Date());
 
-  msg.appendChild(sender);
-  msg.appendChild(content);
-  msg.appendChild(time);
+  body.appendChild(sender);
+  body.appendChild(bubble);
+  body.appendChild(time);
 
   row.appendChild(avatar);
-  row.appendChild(msg);
+  row.appendChild(body);
   messagesEl.appendChild(row);
   scrollToBottom();
 }
 
 function appendSystemMsg(text) {
   const div = document.createElement("div");
-  div.className = "system-msg";
+  div.className = "qq-system-msg";
   div.textContent = text;
   messagesEl.appendChild(div);
   scrollToBottom();
@@ -338,52 +417,7 @@ function formatTime(date) {
 }
 
 function scrollToBottom() {
-  chatMain.scrollTo({ top: chatMain.scrollHeight, behavior: "smooth" });
-}
-
-// ===================== 10. 通知与标题 =====================
-async function requestNotificationPermission() {
-  if (!("Notification" in window)) return;
-  const permission = await Notification.requestPermission();
-  if (permission === "granted") {
-    notificationsEnabled = true;
-    notifyBtn.classList.add("enabled");
-    notifyBtn.title = "消息通知已开启";
-  } else {
-    notifyBtn.title = "通知权限被拒绝";
-  }
-}
-
-notifyBtn.addEventListener("click", requestNotificationPermission);
-
-function showNotification(title, body) {
-  if (!notificationsEnabled || isPageVisible) return;
-  if (Notification.permission !== "granted") return;
-  try {
-    new Notification(title, {
-      body,
-      icon: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
-      badge: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
-      tag: "friend-chat-message",
-      requireInteraction: false,
-    });
-  } catch (e) {
-    console.warn("通知显示失败", e);
-  }
-}
-
-document.addEventListener("visibilitychange", () => {
-  isPageVisible = !document.hidden;
-  if (isPageVisible) {
-    unreadCount = 0;
-    updateTitle();
-  }
-});
-
-function updateTitle() {
-  document.title = unreadCount > 0 && !isPageVisible
-    ? `(${unreadCount}) 新消息 - ${originalTitle}`
-    : originalTitle;
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
 // ===================== 11. 提示音 =====================
@@ -413,25 +447,9 @@ emojiBtn.addEventListener("click", () => {
   }
   emojiPanel = document.createElement("div");
   emojiPanel.className = "emoji-panel";
-  emojiPanel.style.cssText = `
-    position: absolute;
-    bottom: 78px;
-    left: 18px;
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 6px;
-    padding: 10px;
-    background: rgba(0,0,0,0.35);
-    border-radius: 14px;
-    backdrop-filter: blur(10px);
-    z-index: 10;
-  `;
   emojis.forEach((emoji) => {
     const btn = document.createElement("button");
     btn.textContent = emoji;
-    btn.style.cssText = "background:transparent;border:none;font-size:22px;cursor:pointer;padding:4px;border-radius:8px;";
-    btn.onmouseenter = () => (btn.style.background = "rgba(255,255,255,0.15)");
-    btn.onmouseleave = () => (btn.style.background = "transparent");
     btn.addEventListener("click", () => {
       messageInput.value += emoji;
       messageInput.focus();
@@ -440,8 +458,17 @@ emojiBtn.addEventListener("click", () => {
     });
     emojiPanel.appendChild(btn);
   });
-  document.querySelector(".chat-footer").appendChild(emojiPanel);
+  document.body.appendChild(emojiPanel);
+  positionEmojiPanel();
 });
+
+function positionEmojiPanel() {
+  if (!emojiPanel) return;
+  const rect = emojiBtn.getBoundingClientRect();
+  emojiPanel.style.position = "fixed";
+  emojiPanel.style.left = `${rect.left}px`;
+  emojiPanel.style.top = `${rect.top - emojiPanel.offsetHeight - 10}px`;
+}
 
 document.addEventListener("click", (e) => {
   if (emojiPanel && !emojiPanel.contains(e.target) && e.target.id !== "emojiBtn") {
@@ -449,3 +476,5 @@ document.addEventListener("click", (e) => {
     emojiPanel = null;
   }
 });
+
+window.addEventListener("resize", positionEmojiPanel);
