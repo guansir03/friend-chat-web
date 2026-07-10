@@ -187,7 +187,18 @@ enableNotifyBtn.addEventListener("click", async () => {
 });
 
 testNotifyBtn.addEventListener("click", () => {
-  showNotification("测试通知", "如果你看到这条系统弹窗，说明通知功能正常。");
+  if (!("Notification" in window)) return;
+  if (Notification.permission !== "granted") {
+    alert("通知权限未开启，请先点击顶部 🔔 开启。");
+    return;
+  }
+  new Notification("测试通知", {
+    body: "如果你看到这条系统弹窗，说明通知功能正常。",
+    icon: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
+    badge: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
+    tag: "friend-chat-test",
+    requireInteraction: false,
+  });
 });
 
 // 图片预览弹窗
