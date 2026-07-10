@@ -275,7 +275,15 @@ function renderHistory(messages) {
     const sender = document.createElement("div");
     sender.className = "history-item-sender";
     const time = msg.timestamp ? formatTime(new Date(msg.timestamp)) : "";
-    sender.innerHTML = `${escapeHtml(msg.sender || "朋友")}<span class="history-item-time">${time}</span>`;
+
+    const senderName = document.createElement("span");
+    senderName.textContent = msg.sender || "朋友";
+    sender.appendChild(senderName);
+
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "history-item-time";
+    timeSpan.textContent = time;
+    sender.appendChild(timeSpan);
 
     if (msg.text) {
       const textDiv = document.createElement("div");
