@@ -380,7 +380,7 @@ function showNotification(title, body) {
       body,
       icon: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
       badge: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
-      tag: "friend-chat-message",
+      tag: `friend-chat-message-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       requireInteraction: false,
     });
   } catch (e) {
