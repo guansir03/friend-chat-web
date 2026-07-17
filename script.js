@@ -4,10 +4,21 @@ import {
   ref,
   push,
   onChildAdded,
+  onChildRemoved,
   serverTimestamp,
   query,
   limitToLast,
+  get,
+  orderByKey,
+  endBefore,
+  remove,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {
+  getStorage,
+  ref as storageRef,
+  uploadString,
+  getDownloadURL,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 // ===================== 1. Firebase 配置 =====================
 const firebaseConfig = {
@@ -21,17 +32,50 @@ const firebaseConfig = {
 };
 
 const ROOM_ID = "friend-chat-room";
+const APP_VERSION = "20250717";
+
+// 版本检测：如果服务器上的 version.json 比当前版本新，自动刷新获取最新代码
+async function checkAppVersion() {
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.version && data.version !== APP_VERSION) {
+      console.log(`发现新版本 ${data.version}，当前版本 ${APP_VERSION}，即将刷新...`);
+      window.location.reload();
+    }
+  } catch (e) {
+    console.warn("版本检测失败", e);
+  }
+}
+checkAppVersion();
 
 // ===================== 2. 初始化 =====================
 let app;
 let db;
+let storage;
 let messagesRef;
 try {
   app = initializeApp(firebaseConfig);
   db = getDatabase(app);
+  storage = getStorage(app);
   messagesRef = query(ref(db, `rooms/${ROOM_ID}/messages`), limitToLast(500));
 } catch (e) {
   console.error("Firebase 初始化失败，请检查 firebaseConfig", e);
+}
+
+// 尝试将图片上传到 Firebase Storage，失败则返回 null（调用方回退到 base64）
+async function uploadImageToStorage(dataUrl) {
+  if (!storage) return null;
+  try {
+    const filename = `rooms/${ROOM_ID}/images/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+    const sRef = storageRef(storage, filename);
+    await uploadString(sRef, dataUrl, "data_url");
+    return await getDownloadURL(sRef);
+  } catch (e) {
+    console.warn("Storage 上传失败，将回退到数据库存储", e);
+    return null;
+  }
 }
 
 // ===================== 3. DOM 元素 =====================
@@ -76,6 +120,8 @@ let originalTitle = document.title;
 let isPageVisible = true;
 let pendingImage = null; // 待发送的图片 dataUrl
 let messageHistory = []; // 用于历史记录展示
+let oldestMessageKey = null; // 用于加载更早消息
+let isLoadingOlder = false;
 
 const emojis = [
   "😀", "😃", "😄", "😁", "😆", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉",
@@ -295,8 +341,50 @@ function loadHistory() {
   renderHistory(messageHistory);
 }
 
+async function loadOlderMessages() {
+  if (!db || !oldestMessageKey || isLoadingOlder) return;
+  isLoadingOlder = true;
+  try {
+    const olderRef = query(
+      ref(db, `rooms/${ROOM_ID}/messages`),
+      orderByKey(),
+      endBefore(oldestMessageKey),
+      limitToLast(100)
+    );
+    const snapshot = await get(olderRef);
+    const older = [];
+    snapshot.forEach((child) => {
+      const data = child.val();
+      if (data) {
+        data._key = child.key;
+        older.push(data);
+      }
+    });
+    if (older.length > 0) {
+      oldestMessageKey = older[0]._key;
+      messageHistory = [...older, ...messageHistory];
+      renderHistory(messageHistory);
+    } else {
+      appendSystemMsg("没有更早的消息了");
+    }
+  } catch (e) {
+    console.error("加载更早消息失败", e);
+  } finally {
+    isLoadingOlder = false;
+  }
+}
+
 function renderHistory(messages) {
   historyList.innerHTML = "";
+
+  if (oldestMessageKey) {
+    const loadMore = document.createElement("button");
+    loadMore.className = "load-more-btn";
+    loadMore.textContent = "加载更早的消息";
+    loadMore.addEventListener("click", loadOlderMessages);
+    historyList.appendChild(loadMore);
+  }
+
   let lastDate = "";
 
   messages.forEach((msg) => {
@@ -420,7 +508,7 @@ function sendSticker(sticker) {
   });
 }
 
-function sendMessage() {
+async function sendMessage() {
   const text = messageInput.value.trim();
   if ((!text && !pendingImage) || !db) return;
 
@@ -430,13 +518,23 @@ function sendMessage() {
     timestamp: serverTimestamp(),
   };
 
-  if (pendingImage && text) {
+  let imageUrl = pendingImage;
+
+  // 优先上传到 Firebase Storage，失败则保留 base64（会占用数据库空间）
+  if (pendingImage) {
+    uploadProgress.textContent = "图片上传中...";
+    const uploaded = await uploadImageToStorage(pendingImage);
+    if (uploaded) imageUrl = uploaded;
+    uploadProgress.textContent = "";
+  }
+
+  if (imageUrl && text) {
     payload.type = "mixed";
     payload.text = text;
-    payload.imageUrl = pendingImage;
-  } else if (pendingImage) {
+    payload.imageUrl = imageUrl;
+  } else if (imageUrl) {
     payload.type = "image";
-    payload.imageUrl = pendingImage;
+    payload.imageUrl = imageUrl;
   } else {
     payload.type = "text";
     payload.text = text;
@@ -549,7 +647,9 @@ function listenMessages() {
   onChildAdded(messagesRef, (snapshot) => {
     const data = snapshot.val();
     if (!data) return;
+    data._key = snapshot.key;
 
+    if (!oldestMessageKey) oldestMessageKey = snapshot.key;
     messageHistory.push(data);
 
     const isMine = data.sender === myName && data.avatar === myAvatar;
@@ -569,6 +669,13 @@ function listenMessages() {
     }
   });
 
+  onChildRemoved(ref(db, `rooms/${ROOM_ID}/messages`), (snapshot) => {
+    const key = snapshot.key;
+    messageHistory = messageHistory.filter((m) => m._key !== key);
+    const el = document.querySelector(`.message-row[data-key="${key}"]`);
+    if (el) el.remove();
+  });
+
   const typingRef = query(ref(db, `rooms/${ROOM_ID}/typing`), limitToLast(1));
   onChildAdded(typingRef, (snapshot) => {
     const data = snapshot.val();
@@ -585,6 +692,7 @@ function listenMessages() {
 function appendMessage(data, isMine) {
   const row = document.createElement("div");
   row.className = `message-row ${isMine ? "mine" : "theirs"}`;
+  if (data._key) row.dataset.key = data._key;
 
   const avatar = document.createElement("div");
   avatar.className = "message-avatar";
@@ -612,7 +720,7 @@ function appendMessage(data, isMine) {
           renderer: "svg",
           loop: true,
           autoplay: true,
-          path: `https://fonts.gstatic.com/s/e/notoemoji/latest/${data.codepoint}/lottie.json`,
+          path: `stickers/${data.codepoint}.json`,
         });
         anim.addEventListener("data_ready", () => {
           loaded = true;
@@ -657,10 +765,31 @@ function appendMessage(data, isMine) {
   body.appendChild(bubble);
   body.appendChild(time);
 
+  if (isMine && data._key) {
+    const recallBtn = document.createElement("button");
+    recallBtn.className = "message-recall";
+    recallBtn.textContent = "×";
+    recallBtn.title = "撤回";
+    recallBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      recallMessage(data._key);
+    });
+    body.appendChild(recallBtn);
+  }
+
   row.appendChild(avatar);
   row.appendChild(body);
   messagesEl.appendChild(row);
   scrollToBottom();
+}
+
+function recallMessage(key) {
+  if (!db || !key) return;
+  if (!confirm("确定要撤回这条消息吗？")) return;
+  remove(ref(db, `rooms/${ROOM_ID}/messages/${key}`)).catch((err) => {
+    console.error("撤回失败", err);
+    appendSystemMsg("撤回失败，请检查网络。");
+  });
 }
 
 function appendSystemMsg(text) {

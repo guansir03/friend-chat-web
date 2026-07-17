@@ -101,6 +101,21 @@
     </div>
   </div>
 
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then((reg) => {
+        // 每次打开页面都检查一次 Service Worker 更新
+        reg.update();
+      });
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
+    }
+  </script>
   <script src="https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js"></script>
   <script type="module" src="script.js"></script>
 </body>
