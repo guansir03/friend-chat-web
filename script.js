@@ -32,7 +32,7 @@ const firebaseConfig = {
 };
 
 const ROOM_ID = "friend-chat-room";
-const APP_VERSION = "20250717";
+const APP_VERSION = "20250717-2";
 
 // 版本检测：如果服务器上的 version.json 比当前版本新，自动刷新获取最新代码
 async function checkAppVersion() {
@@ -53,15 +53,20 @@ checkAppVersion();
 // ===================== 2. 初始化 =====================
 let app;
 let db;
-let storage;
+let storage = null;
 let messagesRef;
 try {
   app = initializeApp(firebaseConfig);
   db = getDatabase(app);
-  storage = getStorage(app);
   messagesRef = query(ref(db, `rooms/${ROOM_ID}/messages`), limitToLast(500));
 } catch (e) {
   console.error("Firebase 初始化失败，请检查 firebaseConfig", e);
+}
+
+try {
+  storage = getStorage(app);
+} catch (e) {
+  console.warn("Firebase Storage 初始化失败，图片将使用数据库存储", e);
 }
 
 // 尝试将图片上传到 Firebase Storage，失败则返回 null（调用方回退到 base64）
