@@ -32,23 +32,6 @@ const firebaseConfig = {
 };
 
 const ROOM_ID = "friend-chat-room";
-const APP_VERSION = "20250717-2";
-
-// 版本检测：如果服务器上的 version.json 比当前版本新，自动刷新获取最新代码
-async function checkAppVersion() {
-  try {
-    const res = await fetch(`version.json?t=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data.version && data.version !== APP_VERSION) {
-      console.log(`发现新版本 ${data.version}，当前版本 ${APP_VERSION}，即将刷新...`);
-      window.location.reload();
-    }
-  } catch (e) {
-    console.warn("版本检测失败", e);
-  }
-}
-checkAppVersion();
 
 // ===================== 2. 初始化 =====================
 let app;
