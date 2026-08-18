@@ -5,6 +5,7 @@ import {
   push,
   onChildAdded,
   onChildRemoved,
+  onValue,
   serverTimestamp,
   query,
   limitToLast,
@@ -78,7 +79,8 @@ let myAvatar = "🐱";
 let notificationsEnabled = false;
 let unreadCount = 0;
 let originalTitle = document.title;
-let isPageVisible = true;
+let isPageVisible = !document.hidden;
+let initialLoadDone = false; // 初始消息同步完成后才允许响铃/弹通知
 let pendingImage = null; // 待发送的图片 dataUrl
 let messageHistory = []; // 用于历史记录展示
 let oldestMessageKey = null; // 用于加载更早消息
@@ -614,6 +616,11 @@ function compressImage(file, maxWidth = 900, quality = 0.65) {
 function listenMessages() {
   if (!messagesRef) return;
 
+  // onValue 会在所有初始 child_added 之后触发一次，用来标记历史消息加载完毕
+  onValue(messagesRef, () => {
+    initialLoadDone = true;
+  }, { onlyOnce: true });
+
   onChildAdded(messagesRef, (snapshot) => {
     const data = snapshot.val();
     if (!data) return;
@@ -625,7 +632,12 @@ function listenMessages() {
     const isMine = data.sender === myName && data.avatar === myAvatar;
     appendMessage(data, isMine);
 
-    if (!isMine) {
+    // 只有初始同步完成后到达的消息才算新消息；
+    // 时间戳兜底：同步期间朋友刚发的消息（30 秒内）也算新消息
+    const isFresh = data.timestamp && Date.now() - data.timestamp < 30000;
+    const isNewMessage = initialLoadDone || isFresh;
+
+    if (!isMine && isNewMessage) {
       playMessageSound();
       if (!isPageVisible) {
         unreadCount++;
