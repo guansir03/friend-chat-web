@@ -13,12 +13,6 @@ import {
   endBefore,
   remove,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-import {
-  getStorage,
-  ref as storageRef,
-  uploadString,
-  getDownloadURL,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 // ===================== 1. Firebase 配置 =====================
 const firebaseConfig = {
@@ -36,7 +30,6 @@ const ROOM_ID = "friend-chat-room";
 // ===================== 2. 初始化 =====================
 let app;
 let db;
-let storage = null;
 let messagesRef;
 try {
   app = initializeApp(firebaseConfig);
@@ -44,26 +37,6 @@ try {
   messagesRef = query(ref(db, `rooms/${ROOM_ID}/messages`), limitToLast(500));
 } catch (e) {
   console.error("Firebase 初始化失败，请检查 firebaseConfig", e);
-}
-
-try {
-  storage = getStorage(app);
-} catch (e) {
-  console.warn("Firebase Storage 初始化失败，图片将使用数据库存储", e);
-}
-
-// 尝试将图片上传到 Firebase Storage，失败则返回 null（调用方回退到 base64）
-async function uploadImageToStorage(dataUrl) {
-  if (!storage) return null;
-  try {
-    const filename = `rooms/${ROOM_ID}/images/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
-    const sRef = storageRef(storage, filename);
-    await uploadString(sRef, dataUrl, "data_url");
-    return await getDownloadURL(sRef);
-  } catch (e) {
-    console.warn("Storage 上传失败，将回退到数据库存储", e);
-    return null;
-  }
 }
 
 // ===================== 3. DOM 元素 =====================
@@ -508,14 +481,6 @@ async function sendMessage() {
 
   let imageUrl = pendingImage;
 
-  // 优先上传到 Firebase Storage，失败则保留 base64（会占用数据库空间）
-  if (pendingImage) {
-    uploadProgress.textContent = "图片上传中...";
-    const uploaded = await uploadImageToStorage(pendingImage);
-    if (uploaded) imageUrl = uploaded;
-    uploadProgress.textContent = "";
-  }
-
   if (imageUrl && text) {
     payload.type = "mixed";
     payload.text = text;
@@ -531,10 +496,20 @@ async function sendMessage() {
   messageInput.value = "";
   clearPendingImage();
 
-  push(ref(db, `rooms/${ROOM_ID}/messages`), payload).catch((err) => {
-    console.error("发送失败", err);
-    appendSystemMsg("消息发送失败，请检查网络或 Firebase 配置。");
-  });
+  if (imageUrl) {
+    uploadProgress.textContent = "图片发送中...";
+  }
+
+  const msgRef = push(ref(db, `rooms/${ROOM_ID}/messages`), payload);
+  msgRef
+    .then(() => {
+      uploadProgress.textContent = "";
+    })
+    .catch((err) => {
+      console.error("发送失败", err);
+      uploadProgress.textContent = "";
+      appendSystemMsg("消息发送失败，请检查网络或 Firebase 配置。");
+    });
 
   push(ref(db, `rooms/${ROOM_ID}/typing`), {
     sender: myName,
@@ -576,11 +551,15 @@ removePreview.addEventListener("click", clearPendingImage);
 
 async function prepareImage(file) {
   try {
-    uploadProgress.textContent = "图片压缩中...";
-    const dataUrl = await compressImage(file, 1280, 0.8);
+    uploadProgress.textContent = "本地压缩中（未发送）...";
+    let dataUrl = await compressImage(file, 900, 0.65);
 
-    if (dataUrl.length > 1.5 * 1024 * 1024) {
-      uploadProgress.textContent = "图片太大，压缩后仍超过限制。";
+    if (dataUrl.length > 900 * 1024) {
+      dataUrl = await compressImage(file, 600, 0.55);
+    }
+
+    if (dataUrl.length > 1.2 * 1024 * 1024) {
+      uploadProgress.textContent = "图片太大，请压缩后再发送";
       return;
     }
 
@@ -602,7 +581,7 @@ function clearPendingImage() {
   uploadProgress.textContent = "";
 }
 
-function compressImage(file, maxWidth = 1280, quality = 0.8) {
+function compressImage(file, maxWidth = 900, quality = 0.65) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -620,7 +599,10 @@ function compressImage(file, maxWidth = 1280, quality = 0.8) {
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      let dataUrl = canvas.toDataURL("image/webp", quality);
+      if (!dataUrl.startsWith("data:image/webp")) {
+        dataUrl = canvas.toDataURL("image/jpeg", quality);
+      }
       resolve(dataUrl);
     };
     img.onerror = () => reject(new Error("图片读取失败"));

@@ -642,6 +642,12 @@ html, body {
   box-shadow: var(--shadow-sm);
 }
 
+.preview-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
 .preview-remove {
   width: 24px;
   height: 24px;
