@@ -96,6 +96,11 @@
         <h2>📜 历史记录</h2>
         <button class="history-panel-close" id="historyPanelClose" title="关闭">✕</button>
       </header>
+      <div class="history-nav">
+        <input type="date" id="historyDateInput" title="选择日期跳转" />
+        <div class="history-nav-hint" id="historyNavHint" hidden>这一天没有聊天记录（或尚未加载）</div>
+        <div class="history-dates" id="historyDates"></div>
+      </div>
       <div class="history-list" id="historyList">
         <div class="history-empty">加载中...</div>
       </div>

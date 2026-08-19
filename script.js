@@ -69,6 +69,9 @@ const historyPanel = document.getElementById("historyPanel");
 const historyPanelClose = document.getElementById("historyPanelClose");
 const historyPanelBackdrop = document.querySelector(".history-panel-backdrop");
 const historyList = document.getElementById("historyList");
+const historyDateInput = document.getElementById("historyDateInput");
+const historyDates = document.getElementById("historyDates");
+const historyNavHint = document.getElementById("historyNavHint");
 const imageModal = document.getElementById("imageModal");
 const imageModalImg = document.getElementById("imageModalImg");
 const imageModalClose = document.getElementById("imageModalClose");
@@ -289,6 +292,11 @@ historyBtn.addEventListener("click", openHistoryPanel);
 historyPanelClose.addEventListener("click", closeHistoryPanel);
 historyPanelBackdrop.addEventListener("click", closeHistoryPanel);
 
+historyDateInput.max = dateKeyOf(Date.now());
+historyDateInput.addEventListener("change", () => {
+  if (historyDateInput.value) jumpToHistoryDate(historyDateInput.value);
+});
+
 function openHistoryPanel() {
   historyPanel.hidden = false;
   loadHistory();
@@ -350,16 +358,19 @@ function renderHistory(messages) {
     historyList.appendChild(loadMore);
   }
 
-  let lastDate = "";
+  let lastDateKey = "";
+  const dateKeys = [];
 
   messages.forEach((msg) => {
-    const date = msg.timestamp ? formatDate(new Date(msg.timestamp)) : "未知日期";
-    if (date !== lastDate) {
+    const key = msg.timestamp ? dateKeyOf(msg.timestamp) : "unknown";
+    if (key !== lastDateKey) {
       const dateDiv = document.createElement("div");
       dateDiv.className = "history-date";
-      dateDiv.textContent = date;
+      dateDiv.dataset.date = key;
+      dateDiv.textContent = msg.timestamp ? formatChatDate(new Date(msg.timestamp)) : "未知日期";
       historyList.appendChild(dateDiv);
-      lastDate = date;
+      lastDateKey = key;
+      if (key !== "unknown") dateKeys.push(key);
     }
 
     const item = document.createElement("div");
@@ -412,17 +423,44 @@ function renderHistory(messages) {
     item.appendChild(body);
     historyList.appendChild(item);
   });
+
+  renderHistoryDates(dateKeys);
 }
 
-function formatDate(date) {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+// 生成 YYYY-MM-DD 格式的日期 key，用于分组和跳转锚点
+function dateKeyOf(timestamp) {
+  const d = new Date(timestamp);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
 
-  const dStr = date.toLocaleDateString("zh-CN");
-  if (dStr === today.toLocaleDateString("zh-CN")) return "今天";
-  if (dStr === yesterday.toLocaleDateString("zh-CN")) return "昨天";
-  return date.toLocaleDateString("zh-CN", { month: "long", day: "numeric" });
+// 渲染日期快捷标签
+function renderHistoryDates(dateKeys) {
+  historyDates.innerHTML = "";
+  dateKeys.forEach((key) => {
+    const chip = document.createElement("button");
+    chip.className = "history-date-chip";
+    chip.textContent = formatChatDate(new Date(`${key}T00:00:00`));
+    chip.addEventListener("click", () => jumpToHistoryDate(key));
+    historyDates.appendChild(chip);
+  });
+}
+
+// 跳转到某一天的记录并高亮
+function jumpToHistoryDate(key) {
+  const target = historyList.querySelector(`[data-date="${key}"]`);
+  if (!target) {
+    historyNavHint.hidden = false;
+    setTimeout(() => {
+      historyNavHint.hidden = true;
+    }, 2500);
+    return;
+  }
+  historyNavHint.hidden = true;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  target.classList.add("flash");
+  setTimeout(() => target.classList.remove("flash"), 1600);
 }
 
 function showNotification(title, body) {
