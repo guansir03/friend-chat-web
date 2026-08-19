@@ -85,6 +85,8 @@ let pendingImage = null; // 待发送的图片 dataUrl
 let messageHistory = []; // 用于历史记录展示
 let oldestMessageKey = null; // 用于加载更早消息
 let isLoadingOlder = false;
+let lastChatDate = ""; // 聊天区日期分隔条
+let messageMenu = null; // 右键菜单
 
 const emojis = [
   "😀", "😃", "😄", "😁", "😆", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉",
@@ -672,6 +674,18 @@ function listenMessages() {
 
 // ===================== 10. UI 渲染 =====================
 function appendMessage(data, isMine) {
+  // 日期分隔条：消息日期变化时插入
+  if (data.timestamp) {
+    const msgDate = formatChatDate(new Date(data.timestamp));
+    if (msgDate !== lastChatDate) {
+      const divider = document.createElement("div");
+      divider.className = "date-divider";
+      divider.textContent = msgDate;
+      messagesEl.appendChild(divider);
+      lastChatDate = msgDate;
+    }
+  }
+
   const row = document.createElement("div");
   row.className = `message-row ${isMine ? "mine" : "theirs"}`;
   if (data._key) row.dataset.key = data._key;
@@ -747,16 +761,12 @@ function appendMessage(data, isMine) {
   body.appendChild(bubble);
   body.appendChild(time);
 
-  if (isMine && data._key) {
-    const recallBtn = document.createElement("button");
-    recallBtn.className = "message-recall";
-    recallBtn.textContent = "×";
-    recallBtn.title = "撤回";
-    recallBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      recallMessage(data._key);
+  // 右键菜单：复制 / 撤回（仅当至少有一个可用选项时才拦截默认菜单）
+  if (data.text || (isMine && data._key)) {
+    row.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      showMessageMenu(e.clientX, e.clientY, data, isMine);
     });
-    body.appendChild(recallBtn);
   }
 
   row.appendChild(avatar);
@@ -773,6 +783,86 @@ function recallMessage(key) {
     appendSystemMsg("撤回失败，请检查网络。");
   });
 }
+
+// 聊天区日期分隔条格式：今天 / 昨天 / 今年显示月日 / 往年显示完整年月日
+function formatChatDate(date) {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const dStr = date.toLocaleDateString("zh-CN");
+  if (dStr === today.toLocaleDateString("zh-CN")) return "今天";
+  if (dStr === yesterday.toLocaleDateString("zh-CN")) return "昨天";
+  if (date.getFullYear() === today.getFullYear()) {
+    return `${date.getMonth() + 1}月${date.getDate()}日`;
+  }
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+// ===================== 右键菜单（复制 / 撤回） =====================
+function closeMessageMenu() {
+  if (messageMenu) {
+    messageMenu.remove();
+    messageMenu = null;
+  }
+}
+
+function showMessageMenu(x, y, data, isMine) {
+  closeMessageMenu();
+  const menu = document.createElement("div");
+  menu.className = "context-menu";
+
+  if (data.text) {
+    const copyBtn = document.createElement("button");
+    copyBtn.textContent = "复制";
+    copyBtn.addEventListener("click", async () => {
+      closeMessageMenu();
+      try {
+        await navigator.clipboard.writeText(data.text);
+      } catch (e) {
+        console.warn("复制失败", e);
+      }
+    });
+    menu.appendChild(copyBtn);
+  }
+
+  if (isMine && data._key) {
+    const recallBtn = document.createElement("button");
+    recallBtn.textContent = "撤回";
+    recallBtn.className = "danger";
+    recallBtn.addEventListener("click", () => {
+      closeMessageMenu();
+      recallMessage(data._key);
+    });
+    menu.appendChild(recallBtn);
+  }
+
+  if (!menu.hasChildNodes()) return;
+
+  document.body.appendChild(menu);
+  messageMenu = menu;
+
+  // 边界检测，避免菜单超出屏幕
+  const rect = menu.getBoundingClientRect();
+  let left = x;
+  let top = y;
+  if (left + rect.width > window.innerWidth - 8) left = window.innerWidth - rect.width - 8;
+  if (top + rect.height > window.innerHeight - 8) top = window.innerHeight - rect.height - 8;
+  if (left < 8) left = 8;
+  if (top < 8) top = 8;
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+}
+
+document.addEventListener("click", (e) => {
+  if (messageMenu && !messageMenu.contains(e.target)) closeMessageMenu();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeMessageMenu();
+});
+
+chatMain.addEventListener("scroll", closeMessageMenu);
 
 function appendSystemMsg(text) {
   const div = document.createElement("div");
