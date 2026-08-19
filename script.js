@@ -259,13 +259,18 @@ testNotifyBtn.addEventListener("click", () => {
     alert("通知权限未开启，请先点击顶部 🔔 开启。");
     return;
   }
-  new Notification("测试通知", {
+  const n = new Notification("测试通知", {
     body: "如果你看到这条系统弹窗，说明通知功能正常。",
     icon: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
     badge: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
     tag: "friend-chat-test",
     requireInteraction: false,
+    data: { url: location.href },
   });
+  n.onclick = () => {
+    window.focus();
+    n.close();
+  };
 });
 
 // 图片预览弹窗
@@ -466,14 +471,34 @@ function jumpToHistoryDate(key) {
 function showNotification(title, body) {
   if (!notificationsEnabled || isPageVisible) return;
   if (Notification.permission !== "granted") return;
+
+  const options = {
+    body,
+    icon: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
+    badge: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
+    tag: `friend-chat-message-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    requireInteraction: false,
+    data: { url: location.href },
+  };
+
+  // Service Worker 已接管页面时，走 SW 通知（点击可聚焦/重开聊天页）
+  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.ready
+      .then((reg) => reg.showNotification(title, options))
+      .catch(() => showPageNotification(title, options));
+    return;
+  }
+  showPageNotification(title, options);
+}
+
+// 页面直接弹出的通知（SW 未接管时的兜底），点击聚焦当前标签页
+function showPageNotification(title, options) {
   try {
-    new Notification(title, {
-      body,
-      icon: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
-      badge: "https://cdn-icons-png.flaticon.com/512/2950/2950656.png",
-      tag: `friend-chat-message-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      requireInteraction: false,
-    });
+    const n = new Notification(title, options);
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
   } catch (e) {
     console.warn("通知显示失败", e);
   }

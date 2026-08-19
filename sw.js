@@ -1,4 +1,4 @@
-const CACHE_NAME = 'friend-chat-v20250717-7';
+const CACHE_NAME = 'friend-chat-v20250717-8';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -57,5 +57,23 @@ self.addEventListener('fetch', (event) => {
         return response;
       });
     })
+  );
+});
+
+// 点击系统通知：聚焦已打开的聊天页，没有则新开一个
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || './';
+  event.waitUntil(
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        return clients.openWindow(targetUrl);
+      })
   );
 });
