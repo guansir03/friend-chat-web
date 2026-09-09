@@ -60,9 +60,7 @@ const typingEl = document.getElementById("typing");
 const emojiBtn = document.getElementById("emojiBtn");
 const imageInput = document.getElementById("imageInput");
 const imagePreview = document.getElementById("imagePreview");
-const previewImg = document.getElementById("previewImg");
-const previewFile = document.getElementById("previewFile");
-const removePreview = document.getElementById("removePreview");
+const previewList = document.getElementById("previewList");
 const uploadProgress = document.getElementById("uploadProgress");
 const testNotifyBtn = document.getElementById("testNotifyBtn");
 const historyBtn = document.getElementById("historyBtn");
@@ -85,7 +83,7 @@ let unreadCount = 0;
 let originalTitle = document.title;
 let isPageVisible = !document.hidden;
 let initialLoadDone = false; // 初始消息同步完成后才允许响铃/弹通知
-let pendingFile = null; // 待发送的文件 { kind: "image"|"file", dataUrl, name, size, mime }
+let pendingFiles = []; // 待发送的文件列表 [{ kind: "image"|"file", dataUrl, name, size, mime }]
 let messageHistory = []; // 用于历史记录展示
 let oldestMessageKey = null; // 用于加载更早消息
 let windowOldestKey = null; // 实时窗口内最早消息的 key，用于识别撤回导致的回填消息
@@ -436,6 +434,27 @@ function renderHistory(messages) {
       body.appendChild(fileLink);
     }
 
+    // 多文件消息
+    if (Array.isArray(msg.files)) {
+      msg.files.forEach((f) => {
+        if (f.kind === "image") {
+          const img = document.createElement("img");
+          img.src = f.url;
+          img.alt = f.name || "图片";
+          img.addEventListener("click", () => openImageModal(f.url));
+          body.appendChild(img);
+        } else {
+          const fileLink = document.createElement("a");
+          fileLink.className = "history-item-file";
+          fileLink.href = f.url;
+          fileLink.download = f.name || "文件";
+          fileLink.title = "点击下载";
+          fileLink.textContent = `📄 ${f.name || "文件"}${f.size != null ? `（${formatFileSize(f.size)}）` : ""}`;
+          body.appendChild(fileLink);
+        }
+      });
+    }
+
     body.insertBefore(sender, body.firstChild);
     item.appendChild(avatar);
     item.appendChild(body);
@@ -551,7 +570,7 @@ function sendSticker(sticker) {
 
 async function sendMessage() {
   const text = messageInput.value.trim();
-  if ((!text && !pendingFile) || !db) return;
+  if ((!text && pendingFiles.length === 0) || !db) return;
 
   const payload = {
     sender: myName,
@@ -560,24 +579,38 @@ async function sendMessage() {
   };
   if (text) payload.text = text;
 
-  const file = pendingFile;
-  if (file && file.kind === "image") {
-    payload.type = text ? "mixed" : "image";
-    payload.imageUrl = file.dataUrl;
-  } else if (file) {
-    payload.type = "file";
-    payload.fileUrl = file.dataUrl;
-    payload.fileName = file.name;
-    payload.fileSize = file.size;
-    payload.mimeType = file.mime;
+  const files = pendingFiles.slice();
+
+  if (files.length === 1) {
+    // 单文件保持原有格式，兼容旧消息渲染
+    const f = files[0];
+    if (f.kind === "image") {
+      payload.type = text ? "mixed" : "image";
+      payload.imageUrl = f.dataUrl;
+    } else {
+      payload.type = "file";
+      payload.fileUrl = f.dataUrl;
+      payload.fileName = f.name;
+      payload.fileSize = f.size;
+      payload.mimeType = f.mime;
+    }
+  } else if (files.length > 1) {
+    payload.type = "files";
+    payload.files = files.map((f) => ({
+      kind: f.kind,
+      url: f.dataUrl,
+      name: f.name,
+      size: f.size,
+      mime: f.mime,
+    }));
   } else {
     payload.type = "text";
   }
 
   messageInput.value = "";
-  clearPendingImage();
+  clearPendingFiles();
 
-  if (file) {
+  if (files.length > 0) {
     uploadProgress.textContent = "发送中...";
   }
 
@@ -608,11 +641,14 @@ messageInput.addEventListener("keydown", (e) => {
 });
 
 // ===================== 8. 文件处理（图片是文件的一种，走压缩；其他文件原样发送） =====================
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 非图片文件最大 2MB
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 单个非图片文件最大 2MB
+const MAX_FILES = 6; // 一次最多发送 6 个文件
+const MAX_TOTAL_SIZE = 5 * 1024 * 1024; // 一次发送的总 base64 大小上限
 
 imageInput.addEventListener("change", async (e) => {
-  const file = e.target.files[0];
-  if (file) await prepareFile(file);
+  for (const file of e.target.files) {
+    await addPendingFile(file);
+  }
   imageInput.value = "";
 });
 
@@ -620,19 +656,26 @@ messageInput.addEventListener("paste", async (e) => {
   const items = e.clipboardData?.items;
   if (!items) return;
 
+  const files = [];
   for (let i = 0; i < items.length; i++) {
     if (items[i].kind === "file") {
-      e.preventDefault();
       const file = items[i].getAsFile();
-      if (file) await prepareFile(file);
-      return;
+      if (file) files.push(file);
     }
+  }
+  if (files.length === 0) return;
+
+  e.preventDefault();
+  for (const file of files) {
+    await addPendingFile(file);
   }
 });
 
-removePreview.addEventListener("click", clearPendingImage);
-
-async function prepareFile(file) {
+async function addPendingFile(file) {
+  if (pendingFiles.length >= MAX_FILES) {
+    uploadProgress.textContent = `一次最多发送 ${MAX_FILES} 个文件`;
+    return;
+  }
   try {
     if (file.type.startsWith("image/")) {
       // 图片：压缩后发送
@@ -644,36 +687,71 @@ async function prepareFile(file) {
       }
 
       if (dataUrl.length > 1.2 * 1024 * 1024) {
-        uploadProgress.textContent = "图片太大，请压缩后再发送";
+        uploadProgress.textContent = `图片「${file.name || "未命名"}」太大，已跳过`;
         return;
       }
 
-      pendingFile = { kind: "image", dataUrl, name: file.name || "图片", size: file.size, mime: "image/webp" };
-      previewImg.src = dataUrl;
-      previewImg.hidden = false;
-      previewFile.hidden = true;
+      pendingFiles.push({ kind: "image", dataUrl, name: file.name || "图片", size: file.size, mime: "image/webp" });
     } else {
       // 其他文件：原样读取，限制 2MB
       if (file.size > MAX_FILE_SIZE) {
-        uploadProgress.textContent = "文件超过 2MB，太大了，发送会非常慢，建议压缩后再发";
+        uploadProgress.textContent = `「${file.name}」超过 2MB，已跳过`;
         return;
       }
       uploadProgress.textContent = "读取文件中（未发送）...";
       const dataUrl = await readFileAsDataURL(file);
-      pendingFile = { kind: "file", dataUrl, name: file.name || "文件", size: file.size, mime: file.type || "application/octet-stream" };
-      previewFile.textContent = `📄 ${pendingFile.name}（${formatFileSize(file.size)}）`;
-      previewFile.hidden = false;
-      previewImg.hidden = true;
-      previewImg.src = "";
+      pendingFiles.push({ kind: "file", dataUrl, name: file.name || "文件", size: file.size, mime: file.type || "application/octet-stream" });
     }
 
-    imagePreview.hidden = false;
+    // 总体积兜底，避免单条消息超过数据库写入上限
+    const total = pendingFiles.reduce((sum, f) => sum + f.dataUrl.length, 0);
+    if (total > MAX_TOTAL_SIZE) {
+      pendingFiles.pop();
+      uploadProgress.textContent = "文件总大小超过 5MB，请分开发送";
+      return;
+    }
+
+    renderPreviewList();
     uploadProgress.textContent = "";
     messageInput.focus();
   } catch (err) {
     console.error("文件处理失败", err);
     uploadProgress.textContent = "文件处理失败。";
   }
+}
+
+function renderPreviewList() {
+  previewList.innerHTML = "";
+  pendingFiles.forEach((f, idx) => {
+    const item = document.createElement("div");
+    item.className = "preview-item";
+
+    if (f.kind === "image") {
+      const img = document.createElement("img");
+      img.src = f.dataUrl;
+      img.alt = f.name;
+      item.appendChild(img);
+    } else {
+      const chip = document.createElement("span");
+      chip.className = "preview-file-chip";
+      chip.textContent = `📄 ${f.name}（${formatFileSize(f.size)}）`;
+      chip.title = f.name;
+      item.appendChild(chip);
+    }
+
+    const rm = document.createElement("button");
+    rm.className = "preview-remove";
+    rm.textContent = "✕";
+    rm.title = "移除";
+    rm.addEventListener("click", () => {
+      pendingFiles.splice(idx, 1);
+      renderPreviewList();
+    });
+    item.appendChild(rm);
+
+    previewList.appendChild(item);
+  });
+  imagePreview.hidden = pendingFiles.length === 0;
 }
 
 function readFileAsDataURL(file) {
@@ -692,12 +770,9 @@ function formatFileSize(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function clearPendingImage() {
-  pendingFile = null;
-  previewImg.src = "";
-  previewImg.hidden = false;
-  previewFile.hidden = true;
-  previewFile.textContent = "";
+function clearPendingFiles() {
+  pendingFiles = [];
+  previewList.innerHTML = "";
   imagePreview.hidden = true;
   uploadProgress.textContent = "";
 }
@@ -790,6 +865,7 @@ function listenMessages() {
         let notifyBody = "新消息";
         if (data.type === "image") notifyBody = "[图片]";
         else if (data.type === "file") notifyBody = `[文件] ${data.fileName || ""}`.trim();
+        else if (data.type === "files") notifyBody = `[文件] 共 ${data.files.length} 个`;
         else if (data.type === "sticker") notifyBody = "[超级表情]";
         else if (data.text) notifyBody = data.text;
         showNotification(data.sender || "朋友", notifyBody);
@@ -906,32 +982,27 @@ function appendMessage(data, isMine) {
     }
 
     if (data.fileUrl) {
-      const fileCard = document.createElement("a");
-      fileCard.className = "message-file";
-      fileCard.href = data.fileUrl;
-      fileCard.download = data.fileName || "文件";
-      fileCard.title = "点击下载";
+      bubble.appendChild(buildFileCard(data.fileUrl, data.fileName, data.fileSize));
+    }
 
-      const icon = document.createElement("span");
-      icon.className = "message-file-icon";
-      icon.textContent = "📄";
-
-      const info = document.createElement("span");
-      info.className = "message-file-info";
-
-      const name = document.createElement("span");
-      name.className = "message-file-name";
-      name.textContent = data.fileName || "文件";
-
-      const size = document.createElement("span");
-      size.className = "message-file-size";
-      size.textContent = data.fileSize != null ? formatFileSize(data.fileSize) : "";
-
-      info.appendChild(name);
-      info.appendChild(size);
-      fileCard.appendChild(icon);
-      fileCard.appendChild(info);
-      bubble.appendChild(fileCard);
+    // 多文件消息
+    if (Array.isArray(data.files)) {
+      data.files.forEach((f) => {
+        if (f.kind === "image") {
+          const img = document.createElement("img");
+          img.className = "message-image";
+          img.src = f.url;
+          img.alt = f.name || "图片";
+          img.loading = "lazy";
+          img.addEventListener("click", () => openImageModal(f.url));
+          img.addEventListener("load", () => {
+            if (!initialLoadDone || !userScrolledUp) scrollToBottom(false);
+          });
+          bubble.appendChild(img);
+        } else {
+          bubble.appendChild(buildFileCard(f.url, f.name, f.size));
+        }
+      });
     }
   }
 
@@ -1049,6 +1120,36 @@ document.addEventListener("keydown", (e) => {
 });
 
 chatMain.addEventListener("scroll", closeMessageMenu);
+
+// 构建文件卡片（聊天区用）
+function buildFileCard(url, name, size) {
+  const fileCard = document.createElement("a");
+  fileCard.className = "message-file";
+  fileCard.href = url;
+  fileCard.download = name || "文件";
+  fileCard.title = "点击下载";
+
+  const icon = document.createElement("span");
+  icon.className = "message-file-icon";
+  icon.textContent = "📄";
+
+  const info = document.createElement("span");
+  info.className = "message-file-info";
+
+  const nameEl = document.createElement("span");
+  nameEl.className = "message-file-name";
+  nameEl.textContent = name || "文件";
+
+  const sizeEl = document.createElement("span");
+  sizeEl.className = "message-file-size";
+  sizeEl.textContent = size != null ? formatFileSize(size) : "";
+
+  info.appendChild(nameEl);
+  info.appendChild(sizeEl);
+  fileCard.appendChild(icon);
+  fileCard.appendChild(info);
+  return fileCard;
+}
 
 function appendSystemMsg(text) {
   const div = document.createElement("div");

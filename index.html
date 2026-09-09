@@ -53,16 +53,14 @@
 
       <footer class="chat-footer">
         <div class="input-preview" id="imagePreview" hidden>
-          <img id="previewImg" src="" alt="预览" />
-          <span class="preview-file" id="previewFile" hidden></span>
-          <button class="preview-remove" id="removePreview" title="移除">✕</button>
-          <span class="preview-hint">按 Enter 发送</span>
+          <div class="preview-list" id="previewList"></div>
+          <span class="preview-hint">按 Enter 发送（一次最多 6 个文件）</span>
         </div>
         <div class="input-area">
           <button class="emoji-btn" id="emojiBtn" title="表情">😊</button>
           <label class="image-btn" id="imageBtn" title="发送文件">
             📎
-            <input type="file" id="imageInput" hidden />
+            <input type="file" id="imageInput" multiple hidden />
           </label>
           <input
             type="text"
