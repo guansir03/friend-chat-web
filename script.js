@@ -61,6 +61,7 @@ const emojiBtn = document.getElementById("emojiBtn");
 const imageInput = document.getElementById("imageInput");
 const imagePreview = document.getElementById("imagePreview");
 const previewImg = document.getElementById("previewImg");
+const previewFile = document.getElementById("previewFile");
 const removePreview = document.getElementById("removePreview");
 const uploadProgress = document.getElementById("uploadProgress");
 const testNotifyBtn = document.getElementById("testNotifyBtn");
@@ -84,7 +85,7 @@ let unreadCount = 0;
 let originalTitle = document.title;
 let isPageVisible = !document.hidden;
 let initialLoadDone = false; // 初始消息同步完成后才允许响铃/弹通知
-let pendingImage = null; // 待发送的图片 dataUrl
+let pendingFile = null; // 待发送的文件 { kind: "image"|"file", dataUrl, name, size, mime }
 let messageHistory = []; // 用于历史记录展示
 let oldestMessageKey = null; // 用于加载更早消息
 let windowOldestKey = null; // 实时窗口内最早消息的 key，用于识别撤回导致的回填消息
@@ -425,6 +426,16 @@ function renderHistory(messages) {
       body.appendChild(img);
     }
 
+    if (msg.fileUrl) {
+      const fileLink = document.createElement("a");
+      fileLink.className = "history-item-file";
+      fileLink.href = msg.fileUrl;
+      fileLink.download = msg.fileName || "文件";
+      fileLink.title = "点击下载";
+      fileLink.textContent = `📄 ${msg.fileName || "文件"}${msg.fileSize != null ? `（${formatFileSize(msg.fileSize)}）` : ""}`;
+      body.appendChild(fileLink);
+    }
+
     body.insertBefore(sender, body.firstChild);
     item.appendChild(avatar);
     item.appendChild(body);
@@ -540,33 +551,34 @@ function sendSticker(sticker) {
 
 async function sendMessage() {
   const text = messageInput.value.trim();
-  if ((!text && !pendingImage) || !db) return;
+  if ((!text && !pendingFile) || !db) return;
 
   const payload = {
     sender: myName,
     avatar: myAvatar,
     timestamp: serverTimestamp(),
   };
+  if (text) payload.text = text;
 
-  let imageUrl = pendingImage;
-
-  if (imageUrl && text) {
-    payload.type = "mixed";
-    payload.text = text;
-    payload.imageUrl = imageUrl;
-  } else if (imageUrl) {
-    payload.type = "image";
-    payload.imageUrl = imageUrl;
+  const file = pendingFile;
+  if (file && file.kind === "image") {
+    payload.type = text ? "mixed" : "image";
+    payload.imageUrl = file.dataUrl;
+  } else if (file) {
+    payload.type = "file";
+    payload.fileUrl = file.dataUrl;
+    payload.fileName = file.name;
+    payload.fileSize = file.size;
+    payload.mimeType = file.mime;
   } else {
     payload.type = "text";
-    payload.text = text;
   }
 
   messageInput.value = "";
   clearPendingImage();
 
-  if (imageUrl) {
-    uploadProgress.textContent = "图片发送中...";
+  if (file) {
+    uploadProgress.textContent = "发送中...";
   }
 
   const msgRef = push(ref(db, `rooms/${ROOM_ID}/messages`), payload);
@@ -595,10 +607,12 @@ messageInput.addEventListener("keydown", (e) => {
   }
 });
 
-// ===================== 8. 图片处理 =====================
+// ===================== 8. 文件处理（图片是文件的一种，走压缩；其他文件原样发送） =====================
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 非图片文件最大 2MB
+
 imageInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
-  if (file) await prepareImage(file);
+  if (file) await prepareFile(file);
   imageInput.value = "";
 });
 
@@ -607,10 +621,10 @@ messageInput.addEventListener("paste", async (e) => {
   if (!items) return;
 
   for (let i = 0; i < items.length; i++) {
-    if (items[i].type.indexOf("image") !== -1) {
+    if (items[i].kind === "file") {
       e.preventDefault();
       const file = items[i].getAsFile();
-      if (file) await prepareImage(file);
+      if (file) await prepareFile(file);
       return;
     }
   }
@@ -618,34 +632,72 @@ messageInput.addEventListener("paste", async (e) => {
 
 removePreview.addEventListener("click", clearPendingImage);
 
-async function prepareImage(file) {
+async function prepareFile(file) {
   try {
-    uploadProgress.textContent = "本地压缩中（未发送）...";
-    let dataUrl = await compressImage(file, 900, 0.65);
+    if (file.type.startsWith("image/")) {
+      // 图片：压缩后发送
+      uploadProgress.textContent = "本地压缩中（未发送）...";
+      let dataUrl = await compressImage(file, 900, 0.65);
 
-    if (dataUrl.length > 900 * 1024) {
-      dataUrl = await compressImage(file, 600, 0.55);
+      if (dataUrl.length > 900 * 1024) {
+        dataUrl = await compressImage(file, 600, 0.55);
+      }
+
+      if (dataUrl.length > 1.2 * 1024 * 1024) {
+        uploadProgress.textContent = "图片太大，请压缩后再发送";
+        return;
+      }
+
+      pendingFile = { kind: "image", dataUrl, name: file.name || "图片", size: file.size, mime: "image/webp" };
+      previewImg.src = dataUrl;
+      previewImg.hidden = false;
+      previewFile.hidden = true;
+    } else {
+      // 其他文件：原样读取，限制 2MB
+      if (file.size > MAX_FILE_SIZE) {
+        uploadProgress.textContent = "文件超过 2MB，太大了，发送会非常慢，建议压缩后再发";
+        return;
+      }
+      uploadProgress.textContent = "读取文件中（未发送）...";
+      const dataUrl = await readFileAsDataURL(file);
+      pendingFile = { kind: "file", dataUrl, name: file.name || "文件", size: file.size, mime: file.type || "application/octet-stream" };
+      previewFile.textContent = `📄 ${pendingFile.name}（${formatFileSize(file.size)}）`;
+      previewFile.hidden = false;
+      previewImg.hidden = true;
+      previewImg.src = "";
     }
 
-    if (dataUrl.length > 1.2 * 1024 * 1024) {
-      uploadProgress.textContent = "图片太大，请压缩后再发送";
-      return;
-    }
-
-    pendingImage = dataUrl;
-    previewImg.src = dataUrl;
     imagePreview.hidden = false;
     uploadProgress.textContent = "";
     messageInput.focus();
   } catch (err) {
-    console.error("图片处理失败", err);
-    uploadProgress.textContent = "图片处理失败。";
+    console.error("文件处理失败", err);
+    uploadProgress.textContent = "文件处理失败。";
   }
 }
 
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("文件读取失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatFileSize(bytes) {
+  if (!bytes && bytes !== 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function clearPendingImage() {
-  pendingImage = null;
+  pendingFile = null;
   previewImg.src = "";
+  previewImg.hidden = false;
+  previewFile.hidden = true;
+  previewFile.textContent = "";
   imagePreview.hidden = true;
   uploadProgress.textContent = "";
 }
@@ -737,6 +789,7 @@ function listenMessages() {
         updateTitle();
         let notifyBody = "新消息";
         if (data.type === "image") notifyBody = "[图片]";
+        else if (data.type === "file") notifyBody = `[文件] ${data.fileName || ""}`.trim();
         else if (data.type === "sticker") notifyBody = "[超级表情]";
         else if (data.text) notifyBody = data.text;
         showNotification(data.sender || "朋友", notifyBody);
@@ -850,6 +903,35 @@ function appendMessage(data, isMine) {
         if (!initialLoadDone || !userScrolledUp) scrollToBottom(false);
       });
       bubble.appendChild(img);
+    }
+
+    if (data.fileUrl) {
+      const fileCard = document.createElement("a");
+      fileCard.className = "message-file";
+      fileCard.href = data.fileUrl;
+      fileCard.download = data.fileName || "文件";
+      fileCard.title = "点击下载";
+
+      const icon = document.createElement("span");
+      icon.className = "message-file-icon";
+      icon.textContent = "📄";
+
+      const info = document.createElement("span");
+      info.className = "message-file-info";
+
+      const name = document.createElement("span");
+      name.className = "message-file-name";
+      name.textContent = data.fileName || "文件";
+
+      const size = document.createElement("span");
+      size.className = "message-file-size";
+      size.textContent = data.fileSize != null ? formatFileSize(data.fileSize) : "";
+
+      info.appendChild(name);
+      info.appendChild(size);
+      fileCard.appendChild(icon);
+      fileCard.appendChild(info);
+      bubble.appendChild(fileCard);
     }
   }
 

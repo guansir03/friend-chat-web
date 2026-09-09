@@ -498,6 +498,54 @@ html, body {
   margin-top: 8px;
 }
 
+/* File card in chat bubble */
+.message-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  color: var(--text);
+  text-decoration: none;
+  max-width: 260px;
+  transition: background 0.2s, transform 0.2s var(--ease);
+}
+
+.message-text + .message-file {
+  margin-top: 8px;
+}
+
+.message-file:hover {
+  background: rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+.message-file-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.message-file-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.message-file-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-file-size {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .message-time {
   display: block;
   font-size: 11px;
@@ -667,6 +715,14 @@ html, body {
   object-fit: cover;
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
+}
+
+.preview-file {
+  font-size: 13px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .preview-hint {
@@ -1165,6 +1221,24 @@ html, body {
 
 .history-item img:hover {
   transform: scale(1.02);
+}
+
+.history-item-file {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.2s;
+  word-break: break-all;
+}
+
+.history-item-file:hover {
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .load-more-btn {
