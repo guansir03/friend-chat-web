@@ -91,6 +91,7 @@ let windowOldestKey = null; // 实时窗口内最早消息的 key，用于识别
 let isLoadingOlder = false;
 let lastChatDate = ""; // 聊天区日期分隔条
 let messageMenu = null; // 右键菜单
+let userScrolledUp = false; // 用户是否主动上翻查看历史
 
 const emojis = [
   "😀", "😃", "😄", "😁", "😆", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉",
@@ -685,7 +686,20 @@ function listenMessages() {
   // onValue 会在所有初始 child_added 之后触发一次，用来标记历史消息加载完毕
   onValue(messagesRef, () => {
     initialLoadDone = true;
+    // 初始同步完成后贴到最新消息；图片/表情可能还没渲染完，稍后再兜底一次
+    userScrolledUp = false;
+    scrollToBottom(false);
+    setTimeout(() => {
+      if (!userScrolledUp) scrollToBottom(false);
+    }, 600);
   }, { onlyOnce: true });
+
+  // 用户主动上翻后才停止自动贴底；程序触发的滚动不算
+  chatMain.addEventListener("scroll", () => {
+    if (!initialLoadDone) return;
+    userScrolledUp =
+      chatMain.scrollHeight - chatMain.scrollTop - chatMain.clientHeight > 120;
+  });
 
   onChildAdded(messagesRef, (snapshot) => {
     const data = snapshot.val();
@@ -831,6 +845,10 @@ function appendMessage(data, isMine) {
       img.alt = "图片";
       img.loading = "lazy";
       img.addEventListener("click", () => openImageModal(data.imageUrl));
+      // 图片加载完成后页面高度会变，用户没上翻就重新贴底
+      img.addEventListener("load", () => {
+        if (!initialLoadDone || !userScrolledUp) scrollToBottom(false);
+      });
       bubble.appendChild(img);
     }
   }
@@ -854,7 +872,11 @@ function appendMessage(data, isMine) {
   row.appendChild(avatar);
   row.appendChild(body);
   messagesEl.appendChild(row);
-  scrollToBottom();
+
+  // 初始加载期间始终贴底（瞬时）；加载完成后仅在用户未上翻时跟随新消息
+  if (!initialLoadDone || isMine || !userScrolledUp) {
+    scrollToBottom(initialLoadDone);
+  }
 }
 
 function recallMessage(key) {
@@ -958,8 +980,15 @@ function formatTime(date) {
   return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
-function scrollToBottom() {
-  chatMain.scrollTop = chatMain.scrollHeight;
+// smooth=false 时绕过 CSS 的 scroll-behavior，直接瞬时跳转
+function scrollToBottom(smooth = true) {
+  if (smooth) {
+    chatMain.scrollTo({ top: chatMain.scrollHeight, behavior: "smooth" });
+  } else {
+    chatMain.style.scrollBehavior = "auto";
+    chatMain.scrollTop = chatMain.scrollHeight;
+    chatMain.style.scrollBehavior = "";
+  }
 }
 
 // ===================== 11. 提示音 =====================

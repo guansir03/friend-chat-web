@@ -1,4 +1,4 @@
-const CACHE_NAME = 'friend-chat-v20250717-9';
+const CACHE_NAME = 'friend-chat-v20250717-10';
 const CORE_ASSETS = [
   './',
   './index.html',
