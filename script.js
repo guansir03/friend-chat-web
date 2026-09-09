@@ -87,6 +87,7 @@ let initialLoadDone = false; // 初始消息同步完成后才允许响铃/弹�
 let pendingImage = null; // 待发送的图片 dataUrl
 let messageHistory = []; // 用于历史记录展示
 let oldestMessageKey = null; // 用于加载更早消息
+let windowOldestKey = null; // 实时窗口内最早消息的 key，用于识别撤回导致的回填消息
 let isLoadingOlder = false;
 let lastChatDate = ""; // 聊天区日期分隔条
 let messageMenu = null; // 右键菜单
@@ -691,7 +692,20 @@ function listenMessages() {
     if (!data) return;
     data._key = snapshot.key;
 
+    // 去重：同一 key 不重复处理
+    if (messageHistory.some((m) => m._key === snapshot.key)) return;
+
+    // 撤回消息后 limit 窗口前移，旧消息会再次触发 child_added；
+    // key 小于窗口最早消息的就是回填消息：只补进历史记录，不在聊天区重复渲染
+    if (windowOldestKey && snapshot.key < windowOldestKey) {
+      const idx = messageHistory.findIndex((m) => m._key > snapshot.key);
+      if (idx === -1) messageHistory.push(data);
+      else messageHistory.splice(idx, 0, data);
+      return;
+    }
+
     if (!oldestMessageKey) oldestMessageKey = snapshot.key;
+    if (!windowOldestKey) windowOldestKey = snapshot.key;
     messageHistory.push(data);
 
     const isMine = data.sender === myName && data.avatar === myAvatar;
@@ -721,6 +735,11 @@ function listenMessages() {
     messageHistory = messageHistory.filter((m) => m._key !== key);
     const el = document.querySelector(`.message-row[data-key="${key}"]`);
     if (el) el.remove();
+    // 如果撤回的是窗口最早消息，窗口最早 key 顺延到当前聊天区的第一条
+    if (key === windowOldestKey) {
+      const firstRow = messagesEl.querySelector(".message-row");
+      windowOldestKey = firstRow ? firstRow.dataset.key : null;
+    }
   });
 
   const typingRef = query(ref(db, `rooms/${ROOM_ID}/typing`), limitToLast(1));
