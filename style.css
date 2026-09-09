@@ -498,6 +498,13 @@ html, body {
   margin-top: 8px;
 }
 
+/* 纯 emoji 消息放大 */
+.message-text.emoji-large {
+  font-size: 36px;
+  line-height: 1.25;
+  letter-spacing: 2px;
+}
+
 /* File card in chat bubble */
 .message-file {
   display: flex;

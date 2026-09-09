@@ -110,7 +110,23 @@ const emojis = [
   "💞", "💕", "❣️", "💔", "💘", "💝", "💟", "♈", "♉", "♊", "♋", "♌",
   "♍", "♎", "♏", "♐", "♑", "♒", "♓",
   "🎉", "🎊", "🎈", "🎂", "🎁", "🎄", "🎃", "🧨", "✨", "🌟", "💫", "⭐",
-  "🌈", "🔥", "💥", "💯", "💢", "💦", "💧", "🌊"
+  "🌈", "🔥", "💥", "💯", "💢", "💦", "💧", "🌊",
+  "🍎", "🍊", "🍋", "🍉", "🍇", "🍓", "🫐", "🍒", "🍑", "🥭", "🍍", "🥝",
+  "🍅", "🥑", "🥦", "🌽", "🌶️", "🥕", "🍔", "🍟", "🍕", "🌭", "🥪", "🌮",
+  "🍜", "🍣", "🍱", "🥟", "🍤", "🍚", "🍦", "🍰", "🍫", "🍬", "☕", "🧋",
+  "🍺", "🍻", "🥂", "🥤",
+  "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮",
+  "🐷", "🐸", "🐵", "🐔", "🐧", "🦆", "🦉", "🐺", "🐴", "🐝", "🦋", "🐌",
+  "🐢", "🐍", "🐙", "🦑", "🦐", "🐠", "🐬", "🐳", "🦈", "🦒", "🐘", "🐿️",
+  "🌸", "🌺", "🌹", "🌷", "🌻", "🌼", "💐", "🍀", "🍁", "🌿", "🌱", "🌵",
+  "🌴", "🍄", "🌙", "🌞", "☁️", "⛅", "🌧️", "⛈️", "❄️", "⛄",
+  "⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🎱", "🏓", "🏸", "🥊", "🎣", "🎮",
+  "🎲", "🎯", "🎳", "🎹", "🎸", "🎤", "🎧", "🎬", "🎨", "🏆", "🥇", "🎖️",
+  "🚗", "🚕", "🚌", "🏎️", "🚓", "🚑", "🚒", "🛵", "🏍️", "🚲", "🚀", "✈️",
+  "🛸", "🚁", "⛵", "🚢", "🗺️", "🏖️", "🏕️", "⛰️", "🏠", "🏡", "🏢", "🏥",
+  "💡", "🔦", "📱", "💻", "⌚", "📷", "🎥", "📺", "🔋", "💰", "💎", "🔑",
+  "🔒", "🔨", "🧲", "💊", "🎀", "📦", "✉️", "📚", "🔍", "🧸", "🪄", "🛍️",
+  "👗", "👔", "👟", "🎩", "👑", "💍", "👓", "🕶️"
 ];
 
 const superEmojis = [
@@ -137,7 +153,33 @@ const superEmojis = [
   { emoji: "🎉", codepoint: "1f389", name: "庆祝" },
   { emoji: "👍", codepoint: "1f44d", name: "赞" },
   { emoji: "🙏", codepoint: "1f64f", name: "祈祷" },
-  { emoji: "🎃", codepoint: "1f383", name: "南瓜" }
+  { emoji: "🎃", codepoint: "1f383", name: "南瓜" },
+  { emoji: "🥹", codepoint: "1f979", name: "含泪" },
+  { emoji: "😇", codepoint: "1f607", name: "天使" },
+  { emoji: "🤗", codepoint: "1f917", name: "抱抱" },
+  { emoji: "🤔", codepoint: "1f914", name: "思考" },
+  { emoji: "😅", codepoint: "1f605", name: "苦笑" },
+  { emoji: "😆", codepoint: "1f606", name: "大笑" },
+  { emoji: "🙃", codepoint: "1f643", name: "倒脸" },
+  { emoji: "😋", codepoint: "1f60b", name: "好吃" },
+  { emoji: "😜", codepoint: "1f61c", name: "鬼脸" },
+  { emoji: "🤑", codepoint: "1f911", name: "财迷" },
+  { emoji: "🤒", codepoint: "1f912", name: "生病" },
+  { emoji: "😷", codepoint: "1f637", name: "口罩" },
+  { emoji: "🤠", codepoint: "1f920", name: "牛仔" },
+  { emoji: "😈", codepoint: "1f608", name: "恶魔" },
+  { emoji: "👋", codepoint: "1f44b", name: "挥手" },
+  { emoji: "👏", codepoint: "1f44f", name: "鼓掌" },
+  { emoji: "💪", codepoint: "1f4aa", name: "加油" },
+  { emoji: "💔", codepoint: "1f494", name: "心碎" },
+  { emoji: "💯", codepoint: "1f4af", name: "满分" },
+  { emoji: "✨", codepoint: "2728", name: "闪亮" },
+  { emoji: "🎂", codepoint: "1f382", name: "蛋糕" },
+  { emoji: "🌹", codepoint: "1f339", name: "玫瑰" },
+  { emoji: "🐱", codepoint: "1f431", name: "猫咪" },
+  { emoji: "🦊", codepoint: "1f98a", name: "狐狸" },
+  { emoji: "😊", codepoint: "1f60a", name: "微笑" },
+  { emoji: "😝", codepoint: "1f61d", name: "吐舌" }
 ];
 
 const avatars = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🐸", "🐙", "🦄", "🐲", "👽"];
@@ -963,6 +1005,8 @@ function appendMessage(data, isMine) {
     if (data.text) {
       const textDiv = document.createElement("div");
       textDiv.className = "message-text";
+      // 纯 emoji 的短消息放大显示
+      if (isEmojiOnlyText(data.text)) textDiv.classList.add("emoji-large");
       textDiv.textContent = data.text;
       bubble.appendChild(textDiv);
     }
@@ -1161,6 +1205,20 @@ function appendSystemMsg(text) {
 
 function formatTime(date) {
   return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+}
+
+// 判断是否为"纯 emoji 短消息"（最多 6 个码位，不含文字/数字/汉字）
+function isEmojiOnlyText(text) {
+  if (!text) return false;
+  const t = text.trim();
+  if (!t || [...t].length > 6) return false;
+  if (/[a-zA-Z0-9\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(t)) return false;
+  const stripped = t
+    .replace(/\p{Extended_Pictographic}/gu, "")
+    .replace(/\p{Emoji_Presentation}/gu, "")
+    .replace(/[\u2600-\u27BF]/g, "")
+    .replace(/[\s\u200d\ufe0f\u20e3]/g, "");
+  return stripped.length === 0;
 }
 
 // smooth=false 时绕过 CSS 的 scroll-behavior，直接瞬时跳转
