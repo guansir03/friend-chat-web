@@ -586,10 +586,35 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+let titleFlashTimer = null;
+
 function updateTitle() {
-  document.title = unreadCount > 0 && !isPageVisible
-    ? `(${unreadCount}) 新消息 - ${originalTitle}`
-    : originalTitle;
+  // 任务栏/Dock 未读角标（安装为桌面应用后生效，普通标签页调用会静默失败）
+  if ("setAppBadge" in navigator) {
+    if (unreadCount > 0 && !isPageVisible) {
+      navigator.setAppBadge(unreadCount).catch(() => {});
+    } else {
+      navigator.clearAppBadge().catch(() => {});
+    }
+  }
+
+  // 标题闪烁提醒（普通标签页模式的兜底）
+  if (titleFlashTimer) {
+    clearInterval(titleFlashTimer);
+    titleFlashTimer = null;
+  }
+  if (unreadCount > 0 && !isPageVisible) {
+    let showAlert = true;
+    document.title = `【${unreadCount}条新消息】${originalTitle}`;
+    titleFlashTimer = setInterval(() => {
+      showAlert = !showAlert;
+      document.title = showAlert
+        ? `【${unreadCount}条新消息】${originalTitle}`
+        : originalTitle;
+    }, 1000);
+  } else {
+    document.title = originalTitle;
+  }
 }
 
 // ===================== 7. 发送消息 =====================
