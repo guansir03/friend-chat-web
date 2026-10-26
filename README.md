@@ -55,12 +55,29 @@ py -m http.server 8080
 - Demo 使用 Firebase 的“测试模式”（公开读写），仅适合熟人小范围使用。
 - 如需更高安全性，可启用 Firebase Authentication 并配置数据库安全规则。
 
+## 安卓 App
+
+`android/` 目录是一个最小 WebView 外壳（加载线上页面，自动跟随网页更新），并在 JS 与原生之间加了通知桥接：网页收到新消息时，App 会发出**系统级通知**（状态栏/横幅/锁屏，点击通知直接打开 App）。
+
+每次推送 `android/` 目录的改动，GitHub Actions 会自动构建 APK 并发布到仓库的 **Releases**（标签 `android-apk`，文件名 `friend-chat.apk`）。也可以在 Actions 页面手动触发 "Build Android APK"。
+
+安装后用卓易通（或普通安装器）安装即可。注意：
+
+- 通知只在 App 进程存活时可用（前台或后台未被杀死）；建议在系统里关闭对该 App 的电池优化、并在最近任务里锁定
+- App 首次启动会请求系统通知权限，请允许
+- 首次打开网页仍需点一次 🔔（App 内会自动视为已开启）
+
 ## 文件结构
 
 ```
 .
-├── index.html    # 页面结构
-├── style.css     # 样式
-├── script.js     # Firebase 实时聊天逻辑
-└── README.md     # 本说明
+├── index.html       # 页面结构
+├── style.css        # 样式
+├── script.js        # Firebase 实时聊天逻辑
+├── sw.js            # Service Worker（缓存与自动更新）
+├── manifest.json    # PWA 配置（可安装为桌面/手机应用）
+├── stickers/        # 本地超级表情 Lottie 动画
+├── icons/           # PWA/安卓图标
+├── android/         # 安卓 App 外壳（WebView + 通知桥接）
+└── .github/workflows/android.yml  # APK 云端构建
 ```

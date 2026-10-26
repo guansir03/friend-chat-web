@@ -261,7 +261,17 @@ function tryAutoLogin() {
 tryAutoLogin();
 
 // ===================== 6. 通知 =====================
+// 是否在安卓 App（WebView）内运行
+function isAndroidApp() {
+  return !!(window.AndroidApp && typeof window.AndroidApp.showNotification === "function");
+}
+
 async function setupNotifications() {
+  // 安卓 App 内：通知权限由系统原生弹窗申请，网页端直接视为已开启
+  if (isAndroidApp()) {
+    updateNotifyState(true);
+    return;
+  }
   if (!("Notification" in window)) return;
   const permission = await Notification.requestPermission();
   updateNotifyState(permission === "granted");
@@ -297,6 +307,10 @@ enableNotifyBtn.addEventListener("click", async () => {
 });
 
 testNotifyBtn.addEventListener("click", () => {
+  if (isAndroidApp()) {
+    window.AndroidApp.showNotification("测试通知", "如果你看到这条系统通知，说明 App 通知功能正常。");
+    return;
+  }
   if (!("Notification" in window)) return;
   if (Notification.permission !== "granted") {
     alert("通知权限未开启，请先点击顶部 🔔 开启。");
@@ -544,6 +558,13 @@ function jumpToHistoryDate(key) {
 
 function showNotification(title, body) {
   if (!notificationsEnabled || isPageVisible) return;
+
+  // 安卓 App 内：通过原生桥接发系统通知（状态栏 + 横幅 + 锁屏）
+  if (isAndroidApp()) {
+    window.AndroidApp.showNotification(title, body);
+    return;
+  }
+
   if (Notification.permission !== "granted") return;
 
   const options = {
