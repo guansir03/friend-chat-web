@@ -21,12 +21,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK components
+      - name: Check preinstalled Android SDK
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platforms;android-34" "build-tools;34.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms" || true
+          ls "$ANDROID_HOME/build-tools" || true
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SDKMANAGER" ]; then yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true; fi
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -34,12 +35,34 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: gradle assembleDebug --no-daemon --stacktrace --warning-mode all
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Upload build log to Firebase on failure
+        if: failure()
+        run: |
+          tail -c 50000 android/build.log > /tmp/build-tail.log || true
+          python3 - <<'EOF'
+          import json, urllib.request
+          try:
+              log = open("/tmp/build-tail.log").read()
+              data = json.dumps({"log": log}).encode()
+              req = urllib.request.Request(
+                  "https://friend-chat-web-c40cf-default-rtdb.firebaseio.com/build-log.json",
+                  data=data, method="PUT")
+              urllib.request.urlopen(req, timeout=30)
+              print("log uploaded")
+          except Exception as e:
+              print("upload failed:", e)
+          EOF
 
       - name: Rename APK
+        if: success()
         run: cp android/app/build/outputs/apk/debug/app-debug.apk friend-chat.apk
 
       - name: Publish APK to release
+        if: success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-apk
