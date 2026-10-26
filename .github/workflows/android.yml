@@ -49,7 +49,7 @@ jobs:
               log = open("/tmp/build-tail.log").read()
               data = json.dumps({"log": log}).encode()
               req = urllib.request.Request(
-                  "https://friend-chat-web-c40cf-default-rtdb.firebaseio.com/build-log.json",
+                  "https://friend-chat-web-c40cf-default-rtdb.firebaseio.com/rooms/build-log.json",
                   data=data, method="PUT")
               urllib.request.urlopen(req, timeout=30)
               print("log uploaded")
